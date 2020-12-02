@@ -1,3 +1,5 @@
+![alt text](https://github.com/EUROVOLC-ML/VolUnD-Toolkit/blob/main/docs/VolUnD-logo.png?raw=true)
+
 # VolUnD Toolkit
 VOLcano UNrest Detection
 

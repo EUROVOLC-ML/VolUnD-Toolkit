@@ -1,0 +1,40 @@
+##############################################################################
+# TRAINING SETUP: please don't delete or modify attributes name (before ':') #
+##############################################################################
+
+# Dataset options
+train_dir: './dataset/trainingSet'
+val_dir: './dataset/validationSet'
+data_len: 512
+channels_list: None
+batch_size: 128
+data_provider: 'ram'
+mean: None
+std: None
+
+# Experiment options
+tag: 'ae'
+log_dir: './logs'
+plot_every: 1000
+log_every: 10
+save_every: 10
+
+# Model options
+layers_base: 1
+channels_base: 16
+min_spatial_size: 2
+start_dilation: 3
+min_sig_dil_ratio: 50
+max_channels: 1024
+h_size: 64
+enable_variational: False
+
+# Training options
+optim: 'Adam'
+reduce_lr_every: None
+reduce_lr_factor: 0.1
+weight_decay: 0.0005
+resume: None
+epochs: 32000
+lr: 0.00001
+device: 'cuda'

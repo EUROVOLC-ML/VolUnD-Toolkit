@@ -57,9 +57,10 @@ class Saver(object):
             f.write('\n')
         
         # Start TensorBoard Daemon to visualize data
-        t = threading.Thread(target=lambda: os.system('tensorboard --logdir=' + str(self.path)))
+        self.tensorboard_port = args['tensorboard_port']
+        t = threading.Thread(target=lambda: os.system('tensorboard --logdir=' + str(self.path) + ' --port=' + str(self.tensorboard_port)))
         t.start()
-        webbrowser.open('http://localhost:6006/', new=1)
+        webbrowser.open('http://localhost:' + str(self.tensorboard_port) + '/', new=1)
 
     def save_checkpoint(self, net: torch.nn.Module, stats: dict, name: str, epoch: int):
         """

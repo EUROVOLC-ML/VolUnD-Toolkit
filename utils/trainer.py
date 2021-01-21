@@ -13,7 +13,7 @@ class Trainer:
         self.args = args
         
         # Setup saver
-        self.saver = Saver(Path(self.args['log_dir']), self.args, sub_dirs=['trainingSet', 'validationSet'], tag=self.args['tag'])
+        self.saver = Saver(Path(self.args['log_dir']), self.args, sub_dirs=list(self.args['datasets'].keys()), tag=self.args['tag'])
 
         # Setup model
         self.net = Model(self.args)
@@ -54,7 +54,7 @@ class Trainer:
         self.splits = list(self.args['datasets'].keys())
 
         # Setup data loader
-        self.loaders = {s: DataLoader(self.args['datasets'][s], batch_size=self.args['batch_size'], shuffle=(s == 'TrainingSet'), num_workers= 0, drop_last=True) for s in self.splits}
+        self.loaders = {s: DataLoader(self.args['datasets'][s], batch_size=self.args['batch_size'], shuffle=(s == list(self.args['datasets'].keys())[0]), num_workers= 0, drop_last=True) for s in self.splits}
 
     def train(self):
         # Initialize output metrics
@@ -73,7 +73,7 @@ class Trainer:
                     epoch_metrics = {}
 
                     # Train: Initialize training reconstruction distances
-                    if split == 'TrainingSet':
+                    if split == list(self.args['datasets'].keys())[0]: # Training Set
                         train_rec_dists = []
 
                     # Process each batch
@@ -95,13 +95,13 @@ class Trainer:
 
                         # Check NaN
                         if torch.isnan(out[0]).all():
-                            if split == 'TrainingSet':
+                            if split == list(self.args['datasets'].keys())[0]:
                                 raise FloatingPointError('Found NaN values')
                             else:
                                 print('Warning: Found NaN values')
 
                         # Training
-                        if split == 'TrainingSet':
+                        if split == list(self.args['datasets'].keys())[0]: # Training Set
                             # Keep track of reconstruction distance
                             train_rec_dists.append(metrics['rec_dist'])
 
@@ -115,7 +115,7 @@ class Trainer:
 
                     # End epoch, training: estimate thresholds from reconstruction distance
                     self.__end_epoch()
-                    if split == 'TrainingSet':
+                    if split == list(self.args['datasets'].keys())[0]: # Training Set
                         # Get stats
                         min_rec_dist = min(train_rec_dists)
                         max_rec_dist = max(train_rec_dists)
@@ -133,7 +133,7 @@ class Trainer:
                             result_metrics[split][k] = result_metrics[split][k] + [avg_v] if k in result_metrics[split] else [avg_v]
 
                     # End epoch, val: compute TPR and FPR
-                    elif split == 'ValidationSet':
+                    elif split == list(self.args['datasets'].keys())[1]: # Validation Set
                         # Compute TPR and FPR
                         tpr_num = torch.cat([x.unsqueeze(0) for x in epoch_metrics['tp']], 0).sum(0).float()
                         tpr_den = torch.cat([x.unsqueeze(0) for x in epoch_metrics['tp'] + epoch_metrics['fn']], 0).sum(0).float()
@@ -170,7 +170,7 @@ class Trainer:
 
     def __forward_batch(self, x, label, args):
         # Set network mode
-        if args['split'] == 'TrainingSet':
+        if args['split'] == list(self.args['datasets'].keys())[0]: # Training Set
             self.net.train()
             torch.set_grad_enabled(True)
         else:
@@ -179,7 +179,7 @@ class Trainer:
 
 #        # Training: add hooks for logging output########################################################################################
 #        hooks = []
-#        if args['split'] == 'TrainingSet' and args['step'] % self.plot_every == 0:
+#        if args['split'] == list(self.args['datasets'].keys())[0] and args['step'] % self.plot_every == 0:
 #            for name,module in self.net.named_modules():
 #                if name != '':
 #                    h = module.register_forward_hook(self.__forward_hook)
@@ -190,13 +190,13 @@ class Trainer:
         mse_loss = self.net.loss(x_rec, x, mu, logvar)
 
         # Optimize
-        if args['split'] == 'TrainingSet':
+        if args['split'] == list(self.args['datasets'].keys())[0]: # Training Set
             self.optim.zero_grad()
             mse_loss.backward()
             self.optim.step()
 
         # Log outputs and gradients
-        if args['split'] == 'TrainingSet' and args['step'] % self.plot_every == 0:
+        if args['split'] == list(self.args['datasets'].keys())[0] and args['step'] % self.plot_every == 0:
             # Log output histograms
             for name,module in self.net.named_modules():
                 if name != '' and hasattr(module, 'last_output'):

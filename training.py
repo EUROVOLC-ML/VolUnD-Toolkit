@@ -53,6 +53,7 @@ def parse():
                                             'plot_every',
                                             'log_every',
                                             'save_every',
+                                            'tensorboard_port',
                                             'layers_base',
                                             'channels_base',
                                             'min_spatial_size',
@@ -93,6 +94,7 @@ log_dir: './logs'\n\
 plot_every: 1000\n\
 log_every: 10\n\
 save_every: 10\n\
+tensorboard_port: 6006\n\
 \n\
 # Model options\n\
 layers_base: 1\n\

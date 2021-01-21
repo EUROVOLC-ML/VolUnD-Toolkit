@@ -4,3 +4,4 @@
 
 # Logs options
 logs_dir: './logs'
+tensorboard_port: 6006

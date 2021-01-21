@@ -38,7 +38,8 @@ def parse():
                 output[name] = value
 
             # Verify setup integrity
-            if not all(key in output.keys() for key in ['logs_dir']):
+            if not all(key in output.keys() for key in ['logs_dir',
+                                            'tensorboard_port']):
                 raise AttributeError("Params consistency broken!")
     except (FileNotFoundError, AttributeError, Exception):
         print("Restoring original params value in the setup file... please try to reconfigure setup.")
@@ -48,7 +49,8 @@ def parse():
 ###################################################################################\n\
 \n\
 # Logs options\n\
-logs_dir: './logs'")
+logs_dir: './logs'\n\
+tensorboard_port: 6006")
         f.close()
         raise AttributeError("Exit")
 
@@ -64,6 +66,7 @@ if __name__ == '__main__':
 
     # Start TensorBoard Daemon to visualize data
     print("Starting TensorBoard... please, wait a bit to loading all results.")
-    t = threading.Thread(target=lambda: os.system('tensorboard --logdir=' + str(logs)))
+    tensorboard_port = args['tensorboard_port']
+    t = threading.Thread(target=lambda: os.system('tensorboard --logdir=' + str(logs) + ' --port=' + str(tensorboard_port)))
     t.start()
-    webbrowser.open('http://localhost:6006/', new=1)
+    webbrowser.open('http://localhost:' + str(tensorboard_port) + '/', new=1)

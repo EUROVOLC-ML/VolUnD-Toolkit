@@ -48,6 +48,7 @@ def parse():
             if not all(key in output.keys() for key in ['checkpoint',
                                             'test_dir',
                                             'data_len',
+                                            'chunk_jump',
                                             'channels_list',
                                             'batch_size',
                                             'data_provider',
@@ -59,7 +60,7 @@ def parse():
         print("Restoring original params value in the setup file... please try to reconfigure setup.")
         f = open(os.path.join(hyperparams_path, 'testingSetup.txt'), 'w')
         f.write("##############################################################################\n\
-# TRAINING SETUP: please don't delete or modify attributes name (before ':') #\n\
+# TESTING SETUP: please don't delete or modify attributes name (before ':') #\n\
 ##############################################################################\n\
 \n\
 # Checkpoints options\n\
@@ -68,6 +69,7 @@ checkpoint: './logs/yyyy-mm-dd_hh-mm-ss_ae/'\n\
 # Dataset options\n\
 test_dir: './dataset/testSet'\n\
 data_len: 512\n\
+chunk_jump: False\n\
 channels_list: None\n\
 batch_size: 128\n\
 data_provider: 'ram'\n\
@@ -142,7 +144,7 @@ if __name__ == '__main__':
     normalize_params={"mean":args['mean'], "std":args['std']}
 
     # Instantiate dataset
-    test_dataset = Dataset(args['test_dir'], chunk_len=args['data_len'], normalize_params=normalize_params, channels_list=args['channels_list'], provider=args['data_provider'])
+    test_dataset = Dataset(args['test_dir'], chunk_len=args['data_len'], chunk_jump=args['chunk_jump'], normalize_params=normalize_params, channels_list=args['channels_list'], provider=args['data_provider'])
     
     # Instantiate loader
     test_loader = data.DataLoader(test_dataset, batch_size=args['batch_size'], shuffle=False, num_workers= 0, drop_last=True)

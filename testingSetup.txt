@@ -1,5 +1,5 @@
 ##############################################################################
-# TRAINING SETUP: please don't delete or modify attributes name (before ':') #
+# TESTING SETUP: please don't delete or modify attributes name (before ':') #
 ##############################################################################
 
 # Checkpoints options
@@ -8,6 +8,7 @@ checkpoint: './logs/yyyy-mm-dd_hh-mm-ss_ae/'
 # Dataset options
 test_dir: './dataset/testSet'
 data_len: 512
+chunk_jump: False
 channels_list: None
 batch_size: 128
 data_provider: 'ram'

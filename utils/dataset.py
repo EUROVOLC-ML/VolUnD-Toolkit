@@ -7,21 +7,20 @@ class FSProvider(TorchDataset):
     """
     Data provider from file system
     """
-    def __init__(self, data_dir, chunk_len, chunk_overlap=0, channels_list=None, cache_dir='./Cache'):
+    def __init__(self, data_dir, chunk_len, chunk_jump=False, channels_list=None, cache_dir='./Cache'):
         """
         Args:
         - data_dir (string): path to directory containing files.
         - chunk_len (int): length of each item returned by the dataset
-        - chunk_overlap (int): overlap between consecutive chunks
+        - chunk_jump (boolean): jump between consecutive chunks or get all remain part after cut data in chunk
         - single_channel (int): select single channel (with given index) from data
         - cache_dir (string): path to directory where dataset information are cached
         """
 
         # Store args
         self.data_dir = os.path.abspath(data_dir)
-        self.chunk_idx_n=0
         self.chunk_len = chunk_len
-        self.chunk_overlap = chunk_overlap
+        self.chunk_jump = chunk_jump
         self.cache_dir = os.path.abspath(cache_dir)
         self.channels_list = channels_list
         
@@ -34,7 +33,7 @@ class FSProvider(TorchDataset):
 
         # Get dataset name for cache
         cache_name = self.data_dir.replace('/', '_').replace('\\', '_')
-        cache_name += f'_fs_{chunk_len}_{chunk_overlap}'
+        cache_name += f'_fs_{chunk_len}_{chunk_jump}'
         cache_name += f'_{"all" if channels_list is None else channels_list}'
         cache_path = os.path.join(self.cache_dir, cache_name)
 
@@ -55,17 +54,25 @@ class FSProvider(TorchDataset):
                 try:
                     # Read file
                     data,label,timestamp=self.read_torch(file_path)
+
                     # Get length
                     length = data.shape[1]
-                    # Check remove outliers
+                    sublenght = data.shape[2]
+
+                    # Get only selected channels
                     if self.channels_list is not None:
                         #channel can be a list
                         data=data[self.channels_list,:,:]
 
                     # Compute chunk starts
                     chunk_starts = range(0, length, 1)
+                    chunk_part_starts = range(0, int(sublenght/self.chunk_len), 1)
+
                     # Prepare item info
-                    chunk_info = [(i,s) for s in chunk_starts]
+                    if self.chunk_jump:
+                        chunk_info = [(i,s,0) for s in chunk_starts]
+                    else:
+                        chunk_info = [(i,s,s2) for s in chunk_starts for s2 in chunk_part_starts]
                  
                     # Add to data map
                     self.data_map = self.data_map + chunk_info
@@ -93,13 +100,12 @@ class FSProvider(TorchDataset):
     
     def __getitem__(self, idx):
         # Index data map
-        file_idx,chunk_start = self.data_map[idx]
+        file_idx,chunk_start,chunk_part_start = self.data_map[idx]
         # Check buffer
         if self.curr_file_idx is not None and self.curr_file_idx == file_idx:
             # Read from buffer
             data,label,timestamp = self.curr_file_data
         else:
-            self.chunk_idx_n = 0
             # Load file
             file_name = self.files[file_idx]
             file_path = os.path.join(self.data_dir, file_name)
@@ -113,10 +119,9 @@ class FSProvider(TorchDataset):
             data = data[self.channels_list,:,:]
 
         # Get chunk
-        chunk = data[:,self.chunk_idx_n,0:self.chunk_len]
-        label_chunk = label[self.chunk_idx_n]
-        time_chunk = timestamp[self.chunk_idx_n]
-        self.chunk_idx_n = self.chunk_idx_n+1
+        chunk = data[:,chunk_start,chunk_part_start*self.chunk_len:(chunk_part_start+1)*self.chunk_len]
+        label_chunk = label[chunk_start]
+        time_chunk = timestamp[chunk_start]
         
         # Free whole data storage
         chunk = chunk.clone()
@@ -128,12 +133,12 @@ class RAMProvider(TorchDataset):
     """
     Data provider from RAM
     """
-    def __init__(self, data_dir, chunk_len, chunk_overlap=0, channels_list=None, cache_dir='./Cache'):
+    def __init__(self, data_dir, chunk_len, chunk_jump=False, channels_list=None, cache_dir='./Cache'):
         """
         Args:
         - data_dir (string): path to directory containing files.
         - chunk_len (int): length of each item returned by the dataset
-        - chunk_overlap (int): overlap between consecutive chunks
+        - chunk_jump (boolean):  jump between consecutive chunks or get all remain part after cut data in chunk
         - single_channel (int): select single channel (with given index) from data
         - cache_dir (string): path to directory where dataset information are cached
         """
@@ -143,7 +148,7 @@ class RAMProvider(TorchDataset):
 
         # Get dataset name for cache
         cache_name = os.path.abspath(data_dir).replace('/', '_').replace('\\', '_')
-        cache_name += f'_ram_{chunk_len}_{chunk_overlap}'
+        cache_name += f'_ram_{chunk_len}_{chunk_jump}'
         cache_name += f'_{"all" if  channels_list is None else channels_list}'
         cache_path = os.path.join(self.cache_dir, cache_name)
 
@@ -157,7 +162,7 @@ class RAMProvider(TorchDataset):
             # Initialize data
             self.data = []
             # Create FS provider
-            fs_provider = FSProvider(data_dir, chunk_len, chunk_overlap, channels_list, cache_dir)
+            fs_provider = FSProvider(data_dir, chunk_len, chunk_jump, channels_list, cache_dir)
             # Read all files
             for i in tqdm(range(len(fs_provider))):
                 # Get data
@@ -179,13 +184,13 @@ class RAMProvider(TorchDataset):
 
 class Dataset(TorchDataset):
     
-    def __init__(self, data_dir, chunk_len, chunk_overlap=0, normalize_params=None, channels_list=None, cache_dir='./Cache', provider='ram'):
+    def __init__(self, data_dir, chunk_len, chunk_jump=False, normalize_params=None, channels_list=None, cache_dir='./Cache', provider='ram'):
         """
         Args:
         - data_dir (string): path to directory containing files.
         - normalize (dict): contains tensors with mean and std (if None, don't normalize)
         - chunk_len (int): length of each item returned by the dataset
-        - chunk_overlap (int): overlap between consecutive chunks
+        - chunk_jump (boolean):  jump between consecutive chunks or get all remain part after cut data in chunk
         - single_channel (int): select single channel (with given index) from data
         - cache_dir (string): path to directory where dataset information are cached
         - provider ('ram'|'fs'): pre-load data on RAM or load from file system
@@ -195,9 +200,9 @@ class Dataset(TorchDataset):
         self.provider = provider
         assert self.provider in ['ram', 'fs'], "Dataset provider must be either 'ram' or 'fs'!"
         if self.provider == 'ram':
-            self.provider = RAMProvider(data_dir, chunk_len, chunk_overlap, channels_list, cache_dir)
+            self.provider = RAMProvider(data_dir, chunk_len, chunk_jump, channels_list, cache_dir)
         elif self.provider == 'fs':
-            self.provider = FSProvider(data_dir, chunk_len, chunk_overlap, channels_list, cache_dir)
+            self.provider = FSProvider(data_dir, chunk_len, chunk_jump, channels_list, cache_dir)
 
         # Store normalization params
         self.normalize_params = normalize_params

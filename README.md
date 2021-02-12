@@ -138,3 +138,5 @@ The main files in the toolkit are:
 
 requirements.txt: can be used to install the modules necessary for the correct functioning of the toolkit by running the following command: “pip install -r requirements.txt”
 
+If you make change to dataset, remember to empty cache folder.
+

@@ -44,6 +44,7 @@ def parse():
                                             'val_dir',
                                             'data_len',
                                             'chunk_jump',
+                                            'chunk_rate',
                                             'channels_list',
                                             'batch_size',
                                             'data_provider',
@@ -84,6 +85,7 @@ train_dir: './dataset/trainingSet'\n\
 val_dir: './dataset/validationSet'\n\
 data_len: 512\n\
 chunk_jump: False\n\
+chunk_rate: 1\n\
 channels_list: None\n\
 batch_size: 128\n\
 data_provider: 'ram'\n\
@@ -136,8 +138,8 @@ if __name__ == '__main__':
     normalize_params={"mean":args['mean'], "std":args['std']}
 
     # Create dataset
-    train_dataset = Dataset(args['train_dir'], chunk_len=args['data_len'], chunk_jump=args['chunk_jump'], normalize_params=normalize_params, channels_list=args['channels_list'], provider=args['data_provider'])
-    val_dataset = Dataset(args['val_dir'], chunk_len=args['data_len'], chunk_jump=args['chunk_jump'], normalize_params=normalize_params, channels_list=args['channels_list'], provider=args['data_provider'])
+    train_dataset = Dataset(args['train_dir'], chunk_len=args['data_len'], chunk_jump=args['chunk_jump'], chunk_rate=args['chunk_rate'], normalize_params=normalize_params, channels_list=args['channels_list'], provider=args['data_provider'])
+    val_dataset = Dataset(args['val_dir'], chunk_len=args['data_len'], chunk_jump=args['chunk_jump'], chunk_rate=args['chunk_rate'], normalize_params=normalize_params, channels_list=args['channels_list'], provider=args['data_provider'])
     
      # Save number of channels
     example,_,_ = train_dataset[0]

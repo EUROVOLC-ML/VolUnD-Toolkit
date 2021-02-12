@@ -7,6 +7,7 @@ train_dir: './dataset/trainingSet'
 val_dir: './dataset/validationSet'
 data_len: 512
 chunk_jump: False
+chunk_rate: 1
 channels_list: None
 batch_size: 128
 data_provider: 'ram'

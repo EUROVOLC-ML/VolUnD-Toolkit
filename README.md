@@ -56,9 +56,11 @@ The main files in the toolkit are:
 
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;○&nbsp;&nbsp;&nbsp;&nbsp;data_len: chunk length (i.e., temporal length of the a single input to the model); default 512
 
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;○&nbsp;&nbsp;&nbsp;&nbsp;chunk_jump: choose if a signal is truncated to data_len or get all part of signal in chunk of data_len; default False
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;○&nbsp;&nbsp;&nbsp;&nbsp;chunk_only_one: take one or all chunk of single signal; default False
 
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;○&nbsp;&nbsp;&nbsp;&nbsp;chunk_rate: take one chunk every chunk_rate consecutive; default 1
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;○&nbsp;&nbsp;&nbsp;&nbsp;chunk_rate: if chunk_only_one=False, take one chunk every chunk_rate; default 1
+
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;○&nbsp;&nbsp;&nbsp;&nbsp;chunk_random_crop: if chunk_only_one=True, take one chunk randomly in single signal; default False
 
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;○&nbsp;&nbsp;&nbsp;&nbsp;channels_list: if present, list of channels (i.e., input stations) to use; default “None”
 

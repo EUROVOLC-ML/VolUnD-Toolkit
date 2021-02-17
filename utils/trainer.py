@@ -176,14 +176,6 @@ class Trainer:
         else:
             self.net.eval()
             torch.set_grad_enabled(False)
-
-#        # Training: add hooks for logging output########################################################################################
-#        hooks = []
-#        if args['split'] == list(self.args['datasets'].keys())[0] and args['step'] % self.plot_every == 0:
-#            for name,module in self.net.named_modules():
-#                if name != '':
-#                    h = module.register_forward_hook(self.__forward_hook)
-#                    hooks.append(h)
         
         # Compute loss
         x_rec, mu, logvar = self.net(x)
@@ -202,9 +194,6 @@ class Trainer:
                 if name != '' and hasattr(module, 'last_output'):
                     # Log histogram
                     self.saver.dump_histogram(module.last_output, args['step'], 'output ' + name)
-#            # Remove hooks###############################################################################################################
-#            for h in hooks:
-#                h.remove()
             # Log parameters and gradients 
             for name,param in self.net.named_parameters():
                 self.saver.dump_histogram(param.grad, args['step'], 'grad ' + name)
@@ -251,21 +240,3 @@ class Trainer:
         # Optimizer scheduler step
         if self.scheduler is not None:
             self.scheduler.step()
-
-    @staticmethod
-    def __forward_hook(module, input, output):
-        """
-        This handles tensor outputs and tuple of tensor outputs
-        """
-        # Check type
-        if isinstance(output, torch.Tensor):
-            # Save output in module
-            module.last_output = output.clone()
-        elif isinstance(output, tuple):
-            # Concatenate into single tensor
-            tensors = []
-            for t in output:
-                tensors.append(t.clone().view(-1))
-            tensors = torch.cat(tensors, 0)
-            # Save output in module
-            module.last_output = tensors

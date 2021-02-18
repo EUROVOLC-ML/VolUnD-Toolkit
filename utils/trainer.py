@@ -16,7 +16,16 @@ class Trainer:
         self.saver = Saver(Path(self.args['log_dir']), self.args, sub_dirs=list(self.args['datasets'].keys()), tag=self.args['tag'])
 
         # Setup model
-        self.net = Model(self.args)
+        self.net = Model(data_len = int(self.args['chunk_len'] / self.args['chunk_linear_subsample']),
+                            data_channels = self.args['data_channels'],
+                            layers_base = self.args['layers_base'],
+                            channels_base = self.args['channels_base'],
+                            min_spatial_size = self.args['min_spatial_size'],
+                            start_dilation = self.args['start_dilation'],
+                            min_sig_dil_ratio = self.args['min_sig_dil_ratio'],
+                            max_channels = self.args['max_channels'],
+                            h_size = self.args['h_size'],
+                            enable_variational = self.args['enable_variational'])
 
         # Check resume
         if self.args['resume'] is not None:

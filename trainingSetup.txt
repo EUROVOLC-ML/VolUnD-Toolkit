@@ -5,10 +5,11 @@
 # Dataset options
 train_dir: './dataset/trainingSet'
 val_dir: './dataset/validationSet'
-data_len: 512
+chunk_len: 512
 chunk_only_one: False
 chunk_rate: 1
 chunk_random_crop: False
+chunk_linear_subsample: 1
 channels_list: None
 batch_size: 128
 data_provider: 'ram'

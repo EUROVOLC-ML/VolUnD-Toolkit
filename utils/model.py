@@ -142,7 +142,7 @@ class Bottleneck(nn.Module):
         return mu, logvar
 
 class Model(nn.Module):
-    def __init__(self, args):
+    def __init__(self, data_len, data_channels, layers_base, channels_base, min_spatial_size, start_dilation, min_sig_dil_ratio, max_channels, h_size, enable_variational):
         """
         Args (dictionary):
         - data_len (int): length of input signal
@@ -162,20 +162,20 @@ class Model(nn.Module):
         super().__init__()
 
         # Store args
-        self.data_len = args['data_len']
-        self.data_channels = args['data_channels']
-        self.layers_base = args['layers_base']
-        self.channels_base = args['channels_base']
-        self.min_spatial_size = args['min_spatial_size']
-        self.start_dilation = args['start_dilation']
-        self.min_sig_dil_ratio = args['min_sig_dil_ratio']
-        self.max_channels = args['max_channels']
-        self.h_size = args['h_size']
-        self.enable_variational = args['enable_variational']
+        self.data_len = data_len
+        self.data_channels = data_channels
+        self.layers_base = layers_base
+        self.channels_base = channels_base
+        self.min_spatial_size = min_spatial_size
+        self.start_dilation = start_dilation
+        self.min_sig_dil_ratio = min_sig_dil_ratio
+        self.max_channels = max_channels
+        self.h_size = h_size
+        self.enable_variational = enable_variational
 
         # Check data length
         if (self.data_len & (self.data_len-1)) != 0:
-            print(f'Warning: model expects input to be power of 2 (got {self.data_len})')
+            raise AttributeError('Warning: model expects input to be power of 2 (got {self.data_len})')
 
         # Track number of channels per block of layers
         layer_channels = []

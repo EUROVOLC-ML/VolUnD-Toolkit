@@ -42,10 +42,11 @@ def parse():
             # Verify setup integrity
             if not all(key in output.keys() for key in ['train_dir',
                                             'val_dir',
-                                            'data_len',
+                                            'chunk_len',
                                             'chunk_only_one',
                                             'chunk_rate',
                                             'chunk_random_crop',
+                                            'chunk_linear_subsample',
                                             'channels_list',
                                             'batch_size',
                                             'data_provider',
@@ -84,10 +85,11 @@ def parse():
 # Dataset options\n\
 train_dir: './dataset/trainingSet'\n\
 val_dir: './dataset/validationSet'\n\
-data_len: 512\n\
+chunk_len: 512\n\
 chunk_only_one: False\n\
 chunk_rate: 1\n\
 chunk_random_crop: False\n\
+chunk_linear_subsample: 1\n\
 channels_list: None\n\
 batch_size: 128\n\
 data_provider: 'ram'\n\
@@ -130,18 +132,13 @@ device: 'cuda'")
 if __name__ == '__main__':
     # Get params
     args = parse()
-
-    # Check chunk lenght
-    n = args['data_len']
-    if not ((n & (n-1) == 0) and n != 0):
-        raise AttributeError("Chunk lenght must be a power of 2!")
     
     # Normalization
     normalize_params={"mean":args['mean'], "std":args['std']}
 
     # Create dataset
-    train_dataset = Dataset(args['train_dir'], chunk_len=args['data_len'], chunk_only_one=args['chunk_only_one'], chunk_rate=args['chunk_rate'], chunk_random_crop=args['chunk_random_crop'], normalize_params=normalize_params, channels_list=args['channels_list'], provider=args['data_provider'])
-    val_dataset = Dataset(args['val_dir'], chunk_len=args['data_len'], chunk_only_one=args['chunk_only_one'], chunk_rate=args['chunk_rate'], chunk_random_crop=args['chunk_random_crop'], normalize_params=normalize_params, channels_list=args['channels_list'], provider=args['data_provider'])
+    train_dataset = Dataset(args['train_dir'], chunk_len=args['chunk_len'], chunk_only_one=args['chunk_only_one'], chunk_rate=args['chunk_rate'], chunk_random_crop=args['chunk_random_crop'], chunk_linear_subsample=args['chunk_linear_subsample'], normalize_params=normalize_params, channels_list=args['channels_list'], provider=args['data_provider'])
+    val_dataset = Dataset(args['val_dir'], chunk_len=args['chunk_len'], chunk_only_one=args['chunk_only_one'], chunk_rate=args['chunk_rate'], chunk_random_crop=args['chunk_random_crop'], chunk_linear_subsample=args['chunk_linear_subsample'], normalize_params=normalize_params, channels_list=args['channels_list'], provider=args['data_provider'])
     
      # Save number of channels
     example,_,_ = train_dataset[0]

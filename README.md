@@ -26,51 +26,52 @@ The main files in the toolkit are:
   - val_dir: folder where the dataset files for the validation phase are located
   - chunk_len: chunk length (i.e., temporal length of the a single input to the model); default 512
   - chunk_only_one: take one or all chunk of single signal; default False
-        - chunk_rate: if chunk_only_one=False, take one chunk every chunk_rate; default 1
-        - chunk_random_crop: if chunk_only_one=True, take one chunk randomly in single signal; default False
-        - chunk_linear_subsample: apply linear subsample to sigle signal, MUST BE A POWER OF 2 (1,2,4,8,16,32,64,128...); default 1 (not apply linear subsample)
-		- channels_list: if present, list of channels (i.e., input stations) to use; default “None”
-		- batch_size: mini-batch size for gradient descent; default 128
-		- data_provider: specifies whether data should be stored on RAM (faster; value “ram”) or should be read from the filesystem (slower; value “fs”); default “ram”
-		- mean: if not None, list of per-channel means for standardization; default None
-		- std: if not None, list of per-channel standard deviations for standardization; default None
-		- tag: name to assign to the training session in the web dashboard
-		- log_dir: folder where to save the training data
-		- plot_every: defines how often (number of iterations) dashboard figures (inputs, reconstructions) should be updated; default 1000
-		- log_every: defines how often (number of iterations) dashboard plots (loss, accuracy) should be updated; default 10
-		- save_every: defines how often (number of epochs) the model should be saved; default 10
-		- layers_base: in the model, number of convolution layers to be applied before down-sampling or up-sampling; default 1
-		- channels_base: in the model, initial number of channels computed from the input signal; default 16
-		- min_spatial_size: in the model, minimum temporal size (in spite of the name), under which down-sampling should not be performed; default 2
-		- start_dilation: in the model, initial dilation values in the encoder’s convolutional layers; default 3
-		- min_sig_dil_ratio: in the model, minimum ratio between temporal length of the signal at each layer and the corresponding dilation value; which the ratio is smaller, dilation is reduced; default 50
-		- max_channels: in the model, channels are doubled at each down-sampling or up-sampling layer, until the maximum number of channels is reached; default 1024
-		- h_size: in the model, size of the representation at the bottleneck; default 64
-		- enable_variational: choose whether to use AE (False) or VAE (True); default False
-		- optim: optimizer to use; default Adam
-		- reduce_lr_every: defines how often (number of epochs) learning rate should be reduced; default None
-		- reduce_lr_factor: defines the factor by which the learning rate should be reduced; default 0.1
-		- weight_decay: weight for L2 regularization; default 0.0005
-		- resume: checkpoint folder to continue previous training
-		- epochs: number of total training epochs; default 32000
-		- lr: starting learning rate; default 0.00001
-		- device: processor to use for training (cpu or cuda); default “cuda”
-	* visualizationSetup.txt: to configure visualization parameters. Parameters:
-		- logs_dir: folder where to find the previously saved training sessions 
-	* testingSetup.txt: to configure the testing parameters. Parameters:
-		- checkpoint: model to be validated (it can be a specific checkpoint file or the folder containing all checkpoints; in this case, the best checkpoint based on training loss will be selected)
-		- test_dir: folder where the dataset files for the testing phase are located
-		- chunk_len: as above
-		- chunk_only_one: as above
-		- chunk_rate: as above
-		- chunk_random_crop: as above
-		- chunk_linear_subsample: as above
-		- channels_list: as above
-		- batch_size: as above
-		- data_provider: as above
-		- device: as above
-		- mean: as above
-		- std: as above
+  - chunk_rate: if chunk_only_one=False, take one chunk every chunk_rate; default 1
+  - chunk_random_crop: if chunk_only_one=True, take one chunk randomly in single signal; default False
+  - chunk_linear_subsample: apply linear subsample to sigle signal, MUST BE A POWER OF 2 (1,2,4,8,16,32,64,128...); default 1 (not apply linear subsample)
+     - channels_list: if present, list of channels (i.e., input stations) to use; default “None”
+     - batch_size: mini-batch size for gradient descent; default 128
+     - data_provider: specifies whether data should be stored on RAM (faster; value “ram”) or should be read from the filesystem (slower; value “fs”); default “ram”
+     - mean: if not None, list of per-channel means for standardization; default None
+     - std: if not None, list of per-channel standard deviations for standardization; default None
+     - tag: name to assign to the training session in the web dashboard
+     - log_dir: folder where to save the training data
+     - plot_every: defines how often (number of iterations) dashboard figures (inputs, reconstructions) should be updated; default 1000
+     - log_every: defines how often (number of iterations) dashboard plots (loss, accuracy) should be updated; default 10
+     - save_every: defines how often (number of epochs) the model should be saved; default 10
+     - layers_base: in the model, number of convolution layers to be applied before down-sampling or up-sampling; default 1
+     - channels_base: in the model, initial number of channels computed from the input signal; default 16
+     - min_spatial_size: in the model, minimum temporal size (in spite of the name), under which down-sampling should not be performed; default 2
+     - start_dilation: in the model, initial dilation values in the encoder’s convolutional layers; default 3
+     - min_sig_dil_ratio: in the model, minimum ratio between temporal length of the signal at each layer and the corresponding dilation value; which the ratio is smaller, dilation is reduced; default 50
+     - max_channels: in the model, channels are doubled at each down-sampling or up-sampling layer, until the maximum number of channels is reached; default 1024
+     - h_size: in the model, size of the representation at the bottleneck; default 64
+     - enable_variational: choose whether to use AE (False) or VAE (True); default False
+     - optim: optimizer to use; default Adam
+     - reduce_lr_every: defines how often (number of epochs) learning rate should be reduced; default None
+     - reduce_lr_factor: defines the factor by which the learning rate should be reduced; default 0.1
+     - weight_decay: weight for L2 regularization; default 0.0005
+     - resume: checkpoint folder to continue previous training
+     - epochs: number of total training epochs; default 32000
+     - lr: starting learning rate; default 0.00001
+     - device: processor to use for training (cpu or cuda); default “cuda”
+* visualizationSetup.txt: to configure visualization parameters. Parameters:
+     - logs_dir: folder where to find the previously saved training sessions 
+* testingSetup.txt: to configure the testing parameters. Parameters:
+     - checkpoint: model to be validated (it can be a specific checkpoint file or the folder containing all checkpoints; in this case, the best checkpoint based on training loss will be selected)
+     - test_dir: folder where the dataset files for the testing phase are located
+     - chunk_len: as above
+     - chunk_only_one: as above
+     - chunk_rate: as above
+     - chunk_random_crop: as above
+     - chunk_linear_subsample: as above
+     - channels_list: as above
+     - batch_size: as above
+     - data_provider: as above
+     - device: as above
+     - mean: as above
+     - std: as above
+
 requirements.txt: can be used to install the modules necessary for the correct functioning of the toolkit by running the following command: “pip install -r requirements.txt”
 
 If you make change to dataset, remember to empty cache folder.

@@ -6,26 +6,26 @@ The toolkit is developed in Python 3 using the PyTorch library, and is structure
 The root directory contains the following folders:
 * cache (internal use): storage directory for internally-processed dataset.
 * dataset: directory containing default locations for train/validation/test files. Each directory can contain an arbitrary number of files, each of which must be saved in PyTorch format (using torch.save) in dictionary format, containing the following keys
-- CHANNEL_NAMES: list of names for each channels,
-- TIME_DESC: natural-language description of the temporal interval of represented in the file
-- DATA: float tensor of size “stations × number of signals × chunk length
-- LABEL (optional): 0 for no activity or normal activity, 1 for e.g. mild volcanic activity, 2 for e.g. energetic eruptive activity ; if not provided, non-normal events will not be emphasized during visualization 
-		* TIMESTAMP: list of Unix timestamps of size “number of signals”, corresponding to the signals in DATA
-	- logs: directory where training sessions are saved.
-	- utils (internal use): directory containing the main source code.
+  - CHANNEL_NAMES: list of names for each channels,
+  - TIME_DESC: natural-language description of the temporal interval of represented in the file
+  - DATA: float tensor of size “stations × number of signals × chunk length
+  - LABEL (optional): 0 for no activity or normal activity, 1 for e.g. mild volcanic activity, 2 for e.g. energetic eruptive activity ; if not provided, non-normal events will not be emphasized during visualization 
+* TIMESTAMP: list of Unix timestamps of size “number of signals”, corresponding to the signals in DATA
+  - logs: directory where training sessions are saved.
+  - utils (internal use): directory containing the main source code.
 	
 The main files in the toolkit are:
-	* training.py: starts the training phase; a web dashboard will also be launched where it is possible to monitor training progress through various plots.
-	* visualization.py: starts an instance of the backend to view past training sessions on the web dashboard sessions.
-	* testing.py: shows reconstruction distances on test data.
-	* trainingSetup.txt: configures the training options. Each options is specified in a single line, using the following syntax: 
+* training.py: starts the training phase; a web dashboard will also be launched where it is possible to monitor training progress through various plots.
+* visualization.py: starts an instance of the backend to view past training sessions on the web dashboard sessions.
+* testing.py: shows reconstruction distances on test data.
+* trainingSetup.txt: configures the training options. Each options is specified in a single line, using the following syntax: 
 		key: value
 		where “key” is an option name, and “value” is the corresponding value. String values should be quoted; numeric values should not be quoted; unspecified values can be provided as “None” (unquoted); list values can be grouped between brackets.
 		Possible options are:
-		- train_dir: folder where the dataset files for the training phase are located
-		- val_dir: folder where the dataset files for the validation phase are located
-		- chunk_len: chunk length (i.e., temporal length of the a single input to the model); default 512
-        - chunk_only_one: take one or all chunk of single signal; default False
+  - train_dir: folder where the dataset files for the training phase are located
+  - val_dir: folder where the dataset files for the validation phase are located
+  - chunk_len: chunk length (i.e., temporal length of the a single input to the model); default 512
+  - chunk_only_one: take one or all chunk of single signal; default False
         - chunk_rate: if chunk_only_one=False, take one chunk every chunk_rate; default 1
         - chunk_random_crop: if chunk_only_one=True, take one chunk randomly in single signal; default False
         - chunk_linear_subsample: apply linear subsample to sigle signal, MUST BE A POWER OF 2 (1,2,4,8,16,32,64,128...); default 1 (not apply linear subsample)

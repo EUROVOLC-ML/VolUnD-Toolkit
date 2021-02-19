@@ -10,9 +10,9 @@ The root directory contains the following folders:
   - TIME_DESC: natural-language description of the temporal interval of represented in the file
   - DATA: float tensor of size “stations × number of signals × chunk length
   - LABEL (optional): 0 for no activity or normal activity, 1 for e.g. mild volcanic activity, 2 for e.g. energetic eruptive activity ; if not provided, non-normal events will not be emphasized during visualization 
-* TIMESTAMP: list of Unix timestamps of size “number of signals”, corresponding to the signals in DATA
-  - logs: directory where training sessions are saved.
-  - utils (internal use): directory containing the main source code.
+  - TIMESTAMP: list of Unix timestamps of size “number of signals”, corresponding to the signals in DATA
+* logs: directory where training sessions are saved.
+* utils (internal use): directory containing the main source code.
 	
 The main files in the toolkit are:
 * training.py: starts the training phase; a web dashboard will also be launched where it is possible to monitor training progress through various plots.

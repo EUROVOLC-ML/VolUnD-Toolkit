@@ -165,7 +165,16 @@ if __name__ == '__main__':
     print("Channels: " + str(args['data_channels']))
 
     # Setup model
-    model = Model(hyperparams)
+    model = Model(data_len = int(hyperparams['chunk_len'] / hyperparams['chunk_linear_subsample']),
+                            data_channels = hyperparams['data_channels'],
+                            layers_base = hyperparams['layers_base'],
+                            channels_base = hyperparams['channels_base'],
+                            min_spatial_size = hyperparams['min_spatial_size'],
+                            start_dilation = hyperparams['start_dilation'],
+                            min_sig_dil_ratio = hyperparams['min_sig_dil_ratio'],
+                            max_channels = hyperparams['max_channels'],
+                            h_size = hyperparams['h_size'],
+                            enable_variational = hyperparams['enable_variational'])
     model.load_state_dict(Saver.load_checkpoint(checkpoint)['state_dict'])
     model.eval()
     model.to(args['device'])

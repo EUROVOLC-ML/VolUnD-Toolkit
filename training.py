@@ -145,7 +145,9 @@ if __name__ == '__main__':
     args['data_channels'] = example.shape[0] # 0=channel, 1=chunk
     if(args['channels_list'] is None):
         args['channels_list'] = torch.arange(args['data_channels'])
-    print("Channels: " + str(args['data_channels']))
+    else:
+        args['channels_list'] = torch.tensor(args['channels_list'], dtype=torch.int32)
+    print("Channels: " + str(args['channels_list'].numpy()))
     
     # Setup dataset dictionary
     args['datasets'] = {'trainingSet': train_dataset, 'validationSet': val_dataset}

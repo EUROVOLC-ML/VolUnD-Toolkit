@@ -238,9 +238,9 @@ class Trainer:
 
         # Plot
         if args['step'] % self.plot_every == 0:
-            for ch in self.ch_list:
-                self.saver.dump_line(x[0,ch,:], args['step'], args['split'], 'CH_'+str(ch.item()))
-                self.saver.dump_line(x_rec[0,ch,:], args['step'], args['split'], 'CH_'+str(ch.item())+'_reconstruction')
+            for index, ch in enumerate(self.ch_list):
+                self.saver.dump_line(x[0,index,:], args['step'], args['split'], 'CH_'+str(ch.item()))
+                self.saver.dump_line(x_rec[0,index,:], args['step'], args['split'], 'CH_'+str(ch.item())+'_reconstruction')
                 
         # Return metrics
         return (x_rec, mu, logvar), metrics

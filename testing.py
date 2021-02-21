@@ -160,9 +160,11 @@ if __name__ == '__main__':
     args['data_channels'] = example.shape[0] # 0=channel, 1=chunk
     if(args['channels_list'] is None):
         args['channels_list'] = torch.arange(args['data_channels'])
+    else:
+        args['channels_list'] = torch.tensor(args['channels_list'], dtype=torch.int32)
     if(args['data_channels'] != hyperparams['data_channels']):
         raise AttributeError("Channels number of checkpoint is not equal to channels number of TestSet!")
-    print("Channels: " + str(args['data_channels']))
+    print("Channels: " + str(args['channels_list'].numpy()))
 
     # Setup model
     model = Model(data_len = int(hyperparams['chunk_len'] / hyperparams['chunk_linear_subsample']),

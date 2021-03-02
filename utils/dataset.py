@@ -57,7 +57,7 @@ class FSProvider(TorchDataset):
         self.curr_file_data = None
 
         # List files
-        self.files = sorted([f for f in os.listdir(self.data_dir) if os.path.isfile(os.path.join(self.data_dir, f)) and is_not_hidden(os.path.join(self.data_dir, f))])
+        self.files = sorted([f for f in os.listdir(self.data_dir) if os.path.isfile(os.path.join(self.data_dir, f)) and is_not_hidden(os.path.join(self.data_dir, f)) and os.path.basename(f)[0] != '.'])
 
         # Check dir
         if len(self.files) == 0:

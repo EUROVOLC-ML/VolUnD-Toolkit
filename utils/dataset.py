@@ -21,7 +21,7 @@ class FSProvider(TorchDataset):
     """
     Data provider from file system
     """
-    def __init__(self, data_dir, chunk_len, chunk_only_one=False, chunk_rate=1, chunk_random_crop=False, chunk_linear_subsample=1, channels_list=None, cache_dir='./Cache', training_mode=None):
+    def __init__(self, data_dir, chunk_len, chunk_only_one=False, chunk_rate=1, chunk_random_crop=False, chunk_linear_subsample=1, channels_list=None, cache_dir='./cache', training_mode=None):
         """
         Args:
         - data_dir (string): path to directory containing files.
@@ -171,7 +171,7 @@ class RAMProvider(TorchDataset):
     """
     Data provider from RAM
     """
-    def __init__(self, data_dir, chunk_len, chunk_only_one=False, chunk_rate=1, chunk_random_crop=False, chunk_linear_subsample=1, channels_list=None, cache_dir='./Cache', training_mode=None):
+    def __init__(self, data_dir, chunk_len, chunk_only_one=False, chunk_rate=1, chunk_random_crop=False, chunk_linear_subsample=1, channels_list=None, cache_dir='./cache', training_mode=None):
         """
         Args:
         - data_dir (string): path to directory containing files.
@@ -226,7 +226,7 @@ class RAMProvider(TorchDataset):
 
 class Dataset(TorchDataset):
     
-    def __init__(self, data_dir, chunk_len, chunk_only_one=False, chunk_rate=1, chunk_random_crop=False, chunk_linear_subsample=1, normalize_params=None, channels_list=None, cache_dir='./Cache', training_mode=None, provider='ram'):
+    def __init__(self, data_dir, chunk_len, chunk_only_one=False, chunk_rate=1, chunk_random_crop=False, chunk_linear_subsample=1, normalize_params=None, channels_list=None, cache_dir='./cache', training_mode=None, provider='ram'):
         """
         Args:
         - data_dir (string): path to directory containing files.

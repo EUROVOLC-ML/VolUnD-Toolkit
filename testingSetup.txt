@@ -17,6 +17,11 @@ batch_size: 128
 data_provider: 'ram'
 mean: None
 std: None
+label_activity: [1]
+label_eruption: [2]
 
 # Model options
 device: 'cuda'
+
+# Image options
+img_quality: 600

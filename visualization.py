@@ -67,6 +67,6 @@ if __name__ == '__main__':
     # Start TensorBoard Daemon to visualize data
     print("Starting TensorBoard... please, wait a bit to loading all results.")
     tensorboard_port = args['tensorboard_port']
-    t = threading.Thread(target=lambda: os.system('tensorboard --logdir=' + str(logs) + ' --port=' + str(tensorboard_port)))
+    t = threading.Thread(target=lambda: os.system('tensorboard --logdir=' + str(logs) + ' --port=' + str(tensorboard_port) + ' --bind_all'))
     t.start()
     webbrowser.open('http://localhost:' + str(tensorboard_port) + '/', new=1)

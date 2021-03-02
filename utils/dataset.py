@@ -3,12 +3,25 @@ from torch.utils.data import Dataset as TorchDataset
 import os
 from tqdm import tqdm
 from random import randint
+from fileReader.readFile import read_file
+
+if os.name=='nt':
+    import win32api, win32con
+    print("Recognise Windows Mode")
+else:
+    print("Recognise Unix Mode")
+def is_not_hidden(f):
+    if os.name=='nt':
+        attribute = win32api.GetFileAttributes(f)
+        return not(attribute & (win32con.FILE_ATTRIBUTE_HIDDEN | win32con.FILE_ATTRIBUTE_SYSTEM))
+    else: #linux-osx
+        return not(f.startswith('.'))
 
 class FSProvider(TorchDataset):
     """
     Data provider from file system
     """
-    def __init__(self, data_dir, chunk_len, chunk_only_one=False, chunk_rate=1, chunk_random_crop=False, chunk_linear_subsample=1, channels_list=None, cache_dir='./Cache'):
+    def __init__(self, data_dir, chunk_len, chunk_only_one=False, chunk_rate=1, chunk_random_crop=False, chunk_linear_subsample=1, channels_list=None, cache_dir='./Cache', training_mode=None):
         """
         Args:
         - data_dir (string): path to directory containing files.
@@ -17,8 +30,9 @@ class FSProvider(TorchDataset):
         - chunk_rate (int): if chunk_only_one=False, take one chunk every chunk_rate
         - chunk_random_crop (boolean): if chunk_only_one=True, take one chunk randomly in single signal
         - chunk_linear_subsample (int): apply linear subsample to sigle signal, MUST BE A POWER OF 2 (1,2,4,8,16,32,64,128...)
-        - single_channel (int): select single channel (with given index) from data
+        - channel_list (list of int): if not None, select channel (with given index) from data
         - cache_dir (string): path to directory where dataset information are cached
+        - training_mode (list of int): if not None, use only data (with given integer) of normal activity
         """
 
         # Store args
@@ -30,6 +44,7 @@ class FSProvider(TorchDataset):
         self.chunk_linear_subsample = chunk_linear_subsample
         self.cache_dir = os.path.abspath(cache_dir)
         self.channels_list = channels_list
+        self.training_mode = training_mode
 
         #Check linear subsample setup value
         if (self.chunk_linear_subsample & (self.chunk_linear_subsample-1)) != 0:
@@ -42,7 +57,7 @@ class FSProvider(TorchDataset):
         self.curr_file_data = None
 
         # List files
-        self.files = sorted(os.listdir(self.data_dir))
+        self.files = sorted([f for f in os.listdir(self.data_dir) if os.path.isfile(os.path.join(self.data_dir, f)) and is_not_hidden(os.path.join(self.data_dir, f))])
 
         # Check dir
         if len(self.files) == 0:
@@ -70,7 +85,12 @@ class FSProvider(TorchDataset):
             
                 try:
                     # Read file
-                    data,label,timestamp=self.read_torch(file_path)
+                    data,label,timestamp=read_file(file_path)
+
+                    #Check training mode
+                    if self.training_mode is not None:
+                        if label not in self.training_mode:
+                            continue
 
                     # Get length
                     length = data.shape[1]
@@ -96,21 +116,13 @@ class FSProvider(TorchDataset):
                    
                 except ImportError:
                     print(f'Bad file: {file_path}. File must be exported by torch lib.')
+            # Check if data_map is empty
+            if len(self.data_map) == 0:
+                raise FileExistsError(f"There isn't any data to use in {self.data_dir} (if train_mode is setted, please check data labels).")
             # Save data map
             print(f'Saving dataset list: {cache_path}')
             os.makedirs(self.cache_dir, exist_ok=True)
             torch.save(self.data_map, cache_path)
-    
-    def read_torch(self, file_path):
-        data_load = torch.load(file_path)
-        data = data_load['DATA']
-        timestamp = data_load['TIMESTAMP']
-        try:
-            label = data_load['LABEL']
-        except(KeyError):
-            print("Label not found: assume all events of class 0 (normal)!")
-            label = torch.zeros(len(timestamp)).tolist()
-        return data,label,timestamp
     
     def __len__(self):
         return int(len(self.data_map)/self.chunk_rate)
@@ -126,7 +138,7 @@ class FSProvider(TorchDataset):
             # Load file
             file_name = self.files[file_idx]
             file_path = os.path.join(self.data_dir, file_name)
-            data,label,timestamp = self.read_torch(file_path)
+            data,label,timestamp = read_file(file_path)
             # Save to buffer
             self.curr_file_idx = file_idx
             self.curr_file_data = (data,label,timestamp)
@@ -159,7 +171,7 @@ class RAMProvider(TorchDataset):
     """
     Data provider from RAM
     """
-    def __init__(self, data_dir, chunk_len, chunk_only_one=False, chunk_rate=1, chunk_random_crop=False, chunk_linear_subsample=1, channels_list=None, cache_dir='./Cache'):
+    def __init__(self, data_dir, chunk_len, chunk_only_one=False, chunk_rate=1, chunk_random_crop=False, chunk_linear_subsample=1, channels_list=None, cache_dir='./Cache', training_mode=None):
         """
         Args:
         - data_dir (string): path to directory containing files.
@@ -168,8 +180,9 @@ class RAMProvider(TorchDataset):
         - chunk_rate (int): if chunk_only_one=False, take one chunk every chunk_rate
         - chunk_random_crop (boolean): if chunk_only_one=True, take one chunk randomly in single signal
         - chunk_linear_subsample (int): apply linear subsample to sigle signal, MUST BE POWER OF 2 (1,2,4,8,16,32,64,128...)
-        - single_channel (int): select single channel (with given index) from data
+        - channel_list (list of int): if not None, select channel (with given index) from data
         - cache_dir (string): path to directory where dataset information are cached
+        - training_mode (list of int): if not None, use only data (with given integer) of normal activity
         """
 
         # Store args
@@ -191,7 +204,7 @@ class RAMProvider(TorchDataset):
             # Initialize data
             self.data = []
             # Create FS provider
-            fs_provider = FSProvider(data_dir, chunk_len=chunk_len, chunk_only_one=chunk_only_one, chunk_rate=chunk_rate, chunk_random_crop=chunk_random_crop, chunk_linear_subsample=chunk_linear_subsample, channels_list=channels_list, cache_dir=cache_dir)
+            fs_provider = FSProvider(data_dir, chunk_len=chunk_len, chunk_only_one=chunk_only_one, chunk_rate=chunk_rate, chunk_random_crop=chunk_random_crop, chunk_linear_subsample=chunk_linear_subsample, channels_list=channels_list, cache_dir=cache_dir, training_mode=training_mode)
             # Read all files
             for i in tqdm(range(len(fs_provider))):
                 # Get data
@@ -213,7 +226,7 @@ class RAMProvider(TorchDataset):
 
 class Dataset(TorchDataset):
     
-    def __init__(self, data_dir, chunk_len, chunk_only_one=False, chunk_rate=1, chunk_random_crop=False, chunk_linear_subsample=1, normalize_params=None, channels_list=None, cache_dir='./Cache', provider='ram'):
+    def __init__(self, data_dir, chunk_len, chunk_only_one=False, chunk_rate=1, chunk_random_crop=False, chunk_linear_subsample=1, normalize_params=None, channels_list=None, cache_dir='./Cache', training_mode=None, provider='ram'):
         """
         Args:
         - data_dir (string): path to directory containing files.
@@ -223,8 +236,9 @@ class Dataset(TorchDataset):
         - chunk_rate (int): if chunk_only_one=False, take one chunk every chunk_rate
         - chunk_random_crop (boolean): if chunk_only_one=True, take one chunk randomly in single signal
         - chunk_linear_subsample (int): apply linear subsample to sigle signal, MUST BE POWER OF 2 (1,2,4,8,16,32,64,128...)
-        - single_channel (int): select single channel (with given index) from data
+        - channel_list (list of int): if not None, select channel (with given index) from data
         - cache_dir (string): path to directory where dataset information are cached
+        - training_mode (list of int): if not None, use only data (with given integer) of normal activity
         - provider ('ram'|'fs'): pre-load data on RAM or load from file system
         """
 
@@ -232,9 +246,9 @@ class Dataset(TorchDataset):
         self.provider = provider
         assert self.provider in ['ram', 'fs'], "Dataset provider must be either 'ram' or 'fs'!"
         if self.provider == 'ram':
-            self.provider = RAMProvider(data_dir, chunk_len=chunk_len, chunk_only_one=chunk_only_one, chunk_rate=chunk_rate, chunk_random_crop=chunk_random_crop, chunk_linear_subsample=chunk_linear_subsample, channels_list=channels_list, cache_dir=cache_dir)
+            self.provider = RAMProvider(data_dir, chunk_len=chunk_len, chunk_only_one=chunk_only_one, chunk_rate=chunk_rate, chunk_random_crop=chunk_random_crop, chunk_linear_subsample=chunk_linear_subsample, channels_list=channels_list, cache_dir=cache_dir, training_mode=training_mode)
         elif self.provider == 'fs':
-            self.provider = FSProvider(data_dir, chunk_len=chunk_len, chunk_only_one=chunk_only_one, chunk_rate=chunk_rate, chunk_random_crop=chunk_random_crop, chunk_linear_subsample=chunk_linear_subsample, channels_list=channels_list, cache_dir=cache_dir)
+            self.provider = FSProvider(data_dir, chunk_len=chunk_len, chunk_only_one=chunk_only_one, chunk_rate=chunk_rate, chunk_random_crop=chunk_random_crop, chunk_linear_subsample=chunk_linear_subsample, channels_list=channels_list, cache_dir=cache_dir, training_mode=training_mode)
 
         # Store normalization params
         self.normalize_params = normalize_params

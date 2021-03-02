@@ -10,6 +10,8 @@ from typing import Union
 from torch.utils.tensorboard import SummaryWriter
 import threading
 import webbrowser
+import matplotlib
+matplotlib.use('Agg')
 from matplotlib import pyplot as plt
 
 class Saver(object):
@@ -58,7 +60,7 @@ class Saver(object):
         
         # Start TensorBoard Daemon to visualize data
         self.tensorboard_port = args['tensorboard_port']
-        t = threading.Thread(target=lambda: os.system('tensorboard --logdir=' + str(self.path) + ' --port=' + str(self.tensorboard_port)))
+        t = threading.Thread(target=lambda: os.system('tensorboard --logdir=' + str(self.path) + ' --port=' + str(self.tensorboard_port) + ' --bind_all'))
         t.start()
         webbrowser.open('http://localhost:' + str(self.tensorboard_port) + '/', new=1)
 

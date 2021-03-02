@@ -11,6 +11,14 @@ from utils.model import Model
 from matplotlib import pyplot as plt
 from datetime import datetime
 
+#Graph visualization on browser
+import matplotlib
+matplotlib.use("WebAgg")
+import sys
+if sys.platform == 'win32':
+    import asyncio
+    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+
 def parse():
     """
     Load args from file. Tries to convert them to best type.
@@ -57,7 +65,10 @@ def parse():
                                             'data_provider',
                                             'mean',
                                             'std',
-                                            'device']):
+                                            'label_activity',
+                                            'label_eruption',
+                                            'device',
+                                            'img_quality']):
                 raise AttributeError("Params consistency broken!")
     except (FileNotFoundError, AttributeError, Exception):
         print("Restoring original params value in the setup file... please try to reconfigure setup.")
@@ -81,60 +92,66 @@ batch_size: 128\n\
 data_provider: 'ram'\n\
 mean: None\n\
 std: None\n\
+label_activity: [1]\n\
+label_eruption: [2]\n\
 \n\
 # Model options\n\
-device: 'cuda'")
+device: 'cuda'\n\
+\n\
+# Image options\n\
+img_quality: 600")
         f.close()
         raise AttributeError("Exit")
 
     # Return
     return output
 
+def plotSetup(ax, x, y, i_channel, outDATETIME, label_activity, label_eruption, y_log=False):
+    max_value = y.max().item()
+    ax.set_xticks(x)
+    ax.set_xticklabels(outDATETIME, rotation=45)
+    ax.xaxis.set_major_locator(plt.MaxNLocator(10))
+    ax.set(xlabel='Timestamp (yyyy-mm-dd-hh-mm-ss)')
+    ax.fill_between(x, np.array(label_activity, dtype=int)*(max_value/2), color='yellow', label='Activity')
+    ax.fill_between(x, np.array(label_eruption, dtype=int)*max_value, color='red', label='Eruption')
+    print("    In progress 1/2...")
+    if not y_log:
+        ax.set(ylabel='Reconstruction distance')
+        ax.plot(x,y, color='green')
+        title="Graph CH" + str(i_channel)
+    else:
+        ax.set(ylabel='Reconstruction distance (LOG scale)')
+        ax.plot(x,y, color='dodgerblue')
+        ax.set_yscale('log')
+        title="Graph (LOG y-scale) CH" + str(i_channel)
+    ax.title.set_text(title)
+    print("    In progress 2/2...")
 
-def plotGraphs(dist, i_channel, outDATETIME, label_activity, label_eruption):
+def plotAndSaveGraphs(dist, i_channel, outDATETIME, label_activity, label_eruption, img_location, dpi=300):
+    # Get channel
+    if (i_channel != ' ALL'):
+        dist_ch = dist[:,i_channel]
+    else:
+        dist_ch = dist.mean(dim=1)
+    x = range(dist_ch.shape[0])
+    y = dist_ch
+    _, ax = plt.subplots(ncols=2, nrows=1, tight_layout=True)
     # Normal y-scale
-    if (i_channel != ' ALL'):
-        dist_ch = dist[:,i_channel]
-    else:
-        dist_ch = dist.mean(dim=1)
-    _, ax = plt.subplots()
-    x = range(dist_ch.shape[0])
-    y = dist_ch
-    plt.xticks(x, outDATETIME, rotation=45)
-    ax.xaxis.set_major_locator(plt.MaxNLocator(10))
-    plt.xlabel('Timestamp (yyyy-mm-dd-hh-mm-ss)')
-    plt.ylabel('Reconstruction distance')
-    max_value = y.max().item()
-    plt.fill_between(x, np.array(label_activity, dtype=int)*(max_value/2), color='yellow', label='Activity')
-    plt.fill_between(x, np.array(label_eruption, dtype=int)*max_value, color='red', label='Eruption')
-    plt.plot(x,y, color='green')
-    plt.legend(loc='upper left', bbox_to_anchor=(1, 1))
-    title="Graph CH" + str(i_channel)
-    ax.title.set_text(title)
-    plt.tight_layout()
-    plt.show()
+    print("Elaborating 1/2...")
+    plotSetup(ax[0], x, y, i_channel, outDATETIME, label_activity, label_eruption, y_log=False)
     # Log y-scale
-    if (i_channel != ' ALL'):
-        dist_ch = dist[:,i_channel]
-    else:
-        dist_ch = dist.mean(dim=1)
-    _, ax = plt.subplots()
-    x = range(dist_ch.shape[0])
-    y = dist_ch
-    plt.xticks(x, outDATETIME, rotation=45)
-    ax.xaxis.set_major_locator(plt.MaxNLocator(10))
-    plt.xlabel('Timestamp (yyyy-mm-dd-hh-mm-ss)')
-    plt.ylabel('Reconstruction distance (Log scale)')
-    max_value = y.max().item()
-    plt.fill_between(x, np.array(label_activity, dtype=int)*(max_value/2), color='yellow', label='Activity')
-    plt.fill_between(x, np.array(label_eruption, dtype=int)*max_value, color='red', label='Eruption')
-    plt.plot(x,y, color='dodgerblue')
-    plt.yscale('log')
+    print("Elaborating 2/2...")
+    plotSetup(ax[1], x, y, i_channel, outDATETIME, label_activity, label_eruption, y_log=True)
+    # Show graphs
+    print("Saving...")
     plt.legend(loc='upper left', bbox_to_anchor=(1, 1))
-    title="Graph (LOG y-scale) CH" + str(i_channel)
-    ax.title.set_text(title)
-    plt.tight_layout()
-    plt.show()
+    if os.path.isfile(img_location):
+        folder = os.path.dirname(os.path.dirname(img_location))
+    else:
+        folder = img_location
+    folder = os.path.join(folder, "testing")
+    os.makedirs(folder, exist_ok=True)
+    plt.savefig(os.path.join(folder, "CH" + str(i_channel) + ".png"), dpi=dpi)
 
 if __name__ == '__main__':
     # Get params
@@ -205,14 +222,18 @@ if __name__ == '__main__':
     dist = outUNIONdiff.pow(2).sum(2).sqrt()
 
     # Compute labels
-    label_activity = [(label==1) for label in outLABEL]
-    label_eruption = [(label==2) for label in outLABEL]
+    label_activity = [(label in args['label_activity']) for label in outLABEL]
+    label_eruption = [(label in args['label_eruption']) for label in outLABEL]
 
     # Plot distance per channel
-    print("Showing graphs per CH...")
+    print("Showing graphs per CH:")
     for i_channel in range(args['data_channels']):
-        plotGraphs(dist, i_channel, outDATETIME, label_activity, label_eruption)
+        print("CHANNEL " + str(i_channel+1) + "/" + str(args['data_channels']) + ":")
+        plotAndSaveGraphs(dist, i_channel, outDATETIME, label_activity, label_eruption, checkpoint, args['img_quality'])
 
     # Plot total distance
-    print("Showing total graphs...")
-    plotGraphs(dist, " ALL", outDATETIME, label_activity, label_eruption)
+    print("Showing total graphs:")
+    plotAndSaveGraphs(dist, " ALL", outDATETIME, label_activity, label_eruption, checkpoint, args['img_quality'])
+
+    # Show graph on browser
+    plt.show()

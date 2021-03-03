@@ -6,7 +6,7 @@
 train_dir: './dataset/trainingSet'
 val_dir: './dataset/validationSet'
 chunk_len: 512
-chunk_only_one: True
+chunk_only_one: False
 chunk_rate: 1
 chunk_random_crop: False
 chunk_linear_subsample: 1
@@ -15,7 +15,7 @@ batch_size: 128
 data_provider: 'ram'
 mean: None
 std: None
-training_mode: [0]
+training_labels: [0]
 
 # Experiment options
 tag: 'ae'

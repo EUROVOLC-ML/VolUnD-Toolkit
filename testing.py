@@ -14,10 +14,13 @@ from datetime import datetime
 #Graph visualization on browser
 import matplotlib
 matplotlib.use("WebAgg")
+matplotlib.rcParams['webagg.address'] = '0.0.0.0'
+matplotlib.rcParams['webagg.open_in_browser'] = False
 import sys
 if sys.platform == 'win32':
     import asyncio
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+import webbrowser
 
 def parse():
     """
@@ -68,7 +71,8 @@ def parse():
                                             'label_activity',
                                             'label_eruption',
                                             'device',
-                                            'img_quality']):
+                                            'img_quality',
+                                            'web_port']):
                 raise AttributeError("Params consistency broken!")
     except (FileNotFoundError, AttributeError, Exception):
         print("Restoring original params value in the setup file... please try to reconfigure setup.")
@@ -99,14 +103,17 @@ label_eruption: [2]\n\
 device: 'cuda'\n\
 \n\
 # Image options\n\
-img_quality: 600")
+img_quality: 600\n\
+\n\
+# Web options\n\
+web_port: 8988")
         f.close()
         raise AttributeError("Exit")
 
     # Return
     return output
 
-def plotSetup(ax, x, y, i_channel, outDATETIME, label_activity, label_eruption, y_log=False):
+def plotSetup(ax, x, y, i_channel, outDATETIME, label_activity, label_eruption, epoch, y_log=False):
     max_value = y.max().item()
     ax.set_xticks(x)
     ax.set_xticklabels(outDATETIME, rotation=45)
@@ -118,16 +125,16 @@ def plotSetup(ax, x, y, i_channel, outDATETIME, label_activity, label_eruption, 
     if not y_log:
         ax.set(ylabel='Reconstruction distance')
         ax.plot(x,y, color='green')
-        title="Graph CH" + str(i_channel)
+        title="Graph CH" + str(i_channel) + f" (epoch {epoch})"
     else:
         ax.set(ylabel='Reconstruction distance (LOG scale)')
         ax.plot(x,y, color='dodgerblue')
         ax.set_yscale('log')
-        title="Graph (LOG y-scale) CH" + str(i_channel)
+        title="Graph (LOG y-scale) CH" + str(i_channel) + f" (epoch {epoch})"
     ax.title.set_text(title)
     print("    In progress 2/2...")
 
-def plotAndSaveGraphs(dist, i_channel, outDATETIME, label_activity, label_eruption, img_location, dpi=300):
+def plotAndSaveGraphs(dist, i_channel, outDATETIME, label_activity, label_eruption, img_location, epoch, dpi=300):
     # Get channel
     if (i_channel != ' ALL'):
         dist_ch = dist[:,i_channel]
@@ -138,10 +145,10 @@ def plotAndSaveGraphs(dist, i_channel, outDATETIME, label_activity, label_erupti
     _, ax = plt.subplots(ncols=2, nrows=1, tight_layout=True)
     # Normal y-scale
     print("Elaborating 1/2...")
-    plotSetup(ax[0], x, y, i_channel, outDATETIME, label_activity, label_eruption, y_log=False)
+    plotSetup(ax[0], x, y, i_channel, outDATETIME, label_activity, label_eruption, epoch, y_log=False)
     # Log y-scale
     print("Elaborating 2/2...")
-    plotSetup(ax[1], x, y, i_channel, outDATETIME, label_activity, label_eruption, y_log=True)
+    plotSetup(ax[1], x, y, i_channel, outDATETIME, label_activity, label_eruption, epoch, y_log=True)
     # Show graphs
     print("Saving...")
     plt.legend(loc='upper left', bbox_to_anchor=(1, 1))
@@ -151,17 +158,21 @@ def plotAndSaveGraphs(dist, i_channel, outDATETIME, label_activity, label_erupti
         folder = img_location
     folder = os.path.join(folder, "testing")
     os.makedirs(folder, exist_ok=True)
-    plt.savefig(os.path.join(folder, "CH" + str(i_channel) + ".png"), dpi=dpi)
+    plt.savefig(os.path.join(folder, "CH" + str(i_channel) + f"_epoch{epoch:05d}" + ".png"), dpi=dpi)
 
 if __name__ == '__main__':
     # Get params
     args = parse()
+
+    # Set backend port
+    matplotlib.rcParams['webagg.port'] = args['web_port']
 
     # Retrieve absolute path of checkpoint
     checkpoint = os.path.abspath(args['checkpoint'])
 
     # Load arguments
     hyperparams = Saver.load_hyperparams(checkpoint)
+    checkpoint_dict = Saver.load_checkpoint(checkpoint)
 
     # Normalization
     normalize_params={"mean":args['mean'], "std":args['std']}
@@ -194,7 +205,7 @@ if __name__ == '__main__':
                             max_channels = hyperparams['max_channels'],
                             h_size = hyperparams['h_size'],
                             enable_variational = hyperparams['enable_variational'])
-    model.load_state_dict(Saver.load_checkpoint(checkpoint)['state_dict'])
+    model.load_state_dict(checkpoint_dict['state_dict'])
     model.eval()
     model.to(args['device'])
 
@@ -229,11 +240,15 @@ if __name__ == '__main__':
     print("Showing graphs per CH:")
     for i_channel in range(args['data_channels']):
         print("CHANNEL " + str(i_channel+1) + "/" + str(args['data_channels']) + ":")
-        plotAndSaveGraphs(dist, i_channel, outDATETIME, label_activity, label_eruption, checkpoint, args['img_quality'])
+        plotAndSaveGraphs(dist, i_channel, outDATETIME, label_activity, label_eruption, checkpoint, checkpoint_dict['epoch'], args['img_quality'])
 
     # Plot total distance
     print("Showing total graphs:")
-    plotAndSaveGraphs(dist, " ALL", outDATETIME, label_activity, label_eruption, checkpoint, args['img_quality'])
+    plotAndSaveGraphs(dist, " ALL", outDATETIME, label_activity, label_eruption, checkpoint, checkpoint_dict['epoch'], args['img_quality'])
 
     # Show graph on browser
+    print("To view figure, visit http://127.0.0.1:" + str(args['web_port']))
+    print("Press Ctrl+C or Ctrl+Break to stop WebAgg server")
+    webbrowser.open('http://127.0.0.1:' + str(args['web_port']) + '/', new=1)
+    print("### Please, ignore the next 2 printed lines ###")
     plt.show()

@@ -13,6 +13,7 @@ import webbrowser
 import matplotlib
 matplotlib.use('Agg')
 from matplotlib import pyplot as plt
+from tqdm import tqdm
 
 class Saver(object):
     """
@@ -74,7 +75,7 @@ class Saver(object):
         for k,v in state_dict.items():
             state_dict[k] = v.cpu()
         # Save
-        torch.save({'state_dict':state_dict,'stats':stats}, self.ckpt_path / f'{name}_{epoch:05d}.pth')
+        torch.save({'state_dict':state_dict,'stats':stats,'epoch':epoch}, self.ckpt_path / f'{name}_{epoch:05d}.pth')
 
     def dump_line(self, line, step, split, name, fmt=''):
         """
@@ -159,7 +160,7 @@ class Saver(object):
                 print(f'Search best checkpoint (minor loss)...')
             loss = torch.load(file_list[0])['stats']['mse_loss']
             checkpoint = file_list[0]
-            for i in range(1,len(file_list)):
+            for i in tqdm(range(1,len(file_list))):
                 loss_tmp = torch.load(file_list[i])['stats']['mse_loss']
                 if loss_tmp < loss:
                     loss = loss_tmp

@@ -52,7 +52,7 @@ def parse():
                                             'data_provider',
                                             'mean',
                                             'std',
-                                            'training_mode',
+                                            'training_labels',
                                             'tag',
                                             'log_dir',
                                             'plot_every',
@@ -96,7 +96,7 @@ batch_size: 128\n\
 data_provider: 'ram'\n\
 mean: None\n\
 std: None\n\
-training_mode: [0]\n\
+training_labels: [0]\n\
 \n\
 # Experiment options\n\
 tag: 'ae'\n\
@@ -139,7 +139,7 @@ if __name__ == '__main__':
     normalize_params={"mean":args['mean'], "std":args['std']}
 
     # Create dataset
-    train_dataset = Dataset(args['train_dir'], chunk_len=args['chunk_len'], chunk_only_one=args['chunk_only_one'], chunk_rate=args['chunk_rate'], chunk_random_crop=args['chunk_random_crop'], chunk_linear_subsample=args['chunk_linear_subsample'], normalize_params=normalize_params, channels_list=args['channels_list'], provider=args['data_provider'], training_mode=args['training_mode'])
+    train_dataset = Dataset(args['train_dir'], chunk_len=args['chunk_len'], chunk_only_one=args['chunk_only_one'], chunk_rate=args['chunk_rate'], chunk_random_crop=args['chunk_random_crop'], chunk_linear_subsample=args['chunk_linear_subsample'], normalize_params=normalize_params, channels_list=args['channels_list'], provider=args['data_provider'], training_labels=args['training_labels'])
     val_dataset = Dataset(args['val_dir'], chunk_len=args['chunk_len'], chunk_only_one=args['chunk_only_one'], chunk_rate=args['chunk_rate'], chunk_random_crop=args['chunk_random_crop'], chunk_linear_subsample=args['chunk_linear_subsample'], normalize_params=normalize_params, channels_list=args['channels_list'], provider=args['data_provider'])
     
      # Save number of channels

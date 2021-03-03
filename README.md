@@ -35,12 +35,13 @@ The main files in the toolkit are:
   - data_provider: specifies whether data should be stored on RAM (faster; value “ram”) or should be read from the filesystem (slower; value “fs”); default “ram”
   - mean: if not None, list of per-channel means for standardization; default None
   - std: if not None, list of per-channel standard deviations for standardization; default None
-  - training_mode if not None, list of normal activity labels; default [0]
+  - training_labels if not None, list of normal activity labels; default [0]
   - tag: name to assign to the training session in the web dashboard
   - log_dir: folder where to save the training data
   - plot_every: defines how often (number of iterations) dashboard figures (inputs, reconstructions) should be updated; default 1000
   - log_every: defines how often (number of iterations) dashboard plots (loss, accuracy) should be updated; default 10
   - save_every: defines how often (number of epochs) the model should be saved; default 10
+  - tensorboard_port: set tensorboard port to view telemetry on browser; default 6006
   - layers_base: in the model, number of convolution layers to be applied before down-sampling or up-sampling; default 1
   - channels_base: in the model, initial number of channels computed from the input signal; default 16
   - min_spatial_size: in the model, minimum temporal size (in spite of the name), under which down-sampling should not be performed; default 2
@@ -58,7 +59,8 @@ The main files in the toolkit are:
   - lr: starting learning rate; default 0.00001
   - device: processor to use for training (cpu or cuda); default “cuda”
 * visualizationSetup.txt: to configure visualization parameters. Parameters:
-  - logs_dir: folder where to find the previously saved training sessions 
+  - logs_dir: folder where to find the previously saved training sessions
+  - tensorboard_port: set tensorboard port to view telemetry on browser; default 6006
 * testingSetup.txt: to configure the testing parameters. Parameters:
   - checkpoint: model to be validated (it can be a specific checkpoint file or the folder containing all checkpoints; in this case, the best checkpoint based on training loss will be selected)
   - test_dir: folder where the dataset files for the testing phase are located
@@ -76,6 +78,7 @@ The main files in the toolkit are:
   - label_eruption: list of eruption activity labels; default [2]
   - device: as above
   - img_quality: dpi of graph's image saved on logs/yyyy-mm-dd_hh-mm-ss_.../testing
+  - web_port: set Tornado port to view result on browser; default 8988 
 
 requirements.txt: can be used to install the modules necessary for the correct functioning of the toolkit by running the following command: “pip install -r requirements.txt”
 

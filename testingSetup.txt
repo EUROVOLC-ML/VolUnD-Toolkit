@@ -25,3 +25,6 @@ device: 'cuda'
 
 # Image options
 img_quality: 600
+
+# Web options
+web_port: 8988

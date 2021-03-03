@@ -21,7 +21,7 @@ class FSProvider(TorchDataset):
     """
     Data provider from file system
     """
-    def __init__(self, data_dir, chunk_len, chunk_only_one=False, chunk_rate=1, chunk_random_crop=False, chunk_linear_subsample=1, channels_list=None, cache_dir='./Cache', training_mode=None):
+    def __init__(self, data_dir, chunk_len, chunk_only_one=False, chunk_rate=1, chunk_random_crop=False, chunk_linear_subsample=1, channels_list=None, cache_dir='./cache', training_labels=None):
         """
         Args:
         - data_dir (string): path to directory containing files.
@@ -32,7 +32,7 @@ class FSProvider(TorchDataset):
         - chunk_linear_subsample (int): apply linear subsample to sigle signal, MUST BE A POWER OF 2 (1,2,4,8,16,32,64,128...)
         - channel_list (list of int): if not None, select channel (with given index) from data
         - cache_dir (string): path to directory where dataset information are cached
-        - training_mode (list of int): if not None, use only data (with given integer) of normal activity
+        - training_labels (list of int): if not None, use only data (with given integer) of normal activity
         """
 
         # Store args
@@ -44,7 +44,7 @@ class FSProvider(TorchDataset):
         self.chunk_linear_subsample = chunk_linear_subsample
         self.cache_dir = os.path.abspath(cache_dir)
         self.channels_list = channels_list
-        self.training_mode = training_mode
+        self.training_labels = training_labels
 
         #Check linear subsample setup value
         if (self.chunk_linear_subsample & (self.chunk_linear_subsample-1)) != 0:
@@ -57,7 +57,7 @@ class FSProvider(TorchDataset):
         self.curr_file_data = None
 
         # List files
-        self.files = sorted([f for f in os.listdir(self.data_dir) if os.path.isfile(os.path.join(self.data_dir, f)) and is_not_hidden(os.path.join(self.data_dir, f))])
+        self.files = sorted([f for f in os.listdir(self.data_dir) if os.path.isfile(os.path.join(self.data_dir, f)) and is_not_hidden(os.path.join(self.data_dir, f)) and os.path.basename(f)[0] != '.'])
 
         # Check dir
         if len(self.files) == 0:
@@ -66,14 +66,31 @@ class FSProvider(TorchDataset):
         # Get dataset name for cache
         cache_name = self.data_dir.replace('/', '_').replace('\\', '_')
         cache_name += f'_fs_{chunk_len}_{chunk_only_one}_{chunk_rate}_{chunk_random_crop}_{chunk_linear_subsample}'
-        cache_name += f'_{"all" if channels_list is None else channels_list}'
+        cache_name += f'_label_{"all" if  training_labels is None else "".join(str(l) for l in training_labels).replace(" ", "_")}'
+        cache_name += f'_ch_{"all" if  channels_list is None else "".join(str(c) for c in channel_list).replace(" ", "_")}'
         cache_path = os.path.join(self.cache_dir, cache_name)
 
+        # Create setup map
+        setup_map = {'files':self.files,
+                    'data_dir':self.data_dir,
+                    'training_labels':self.training_labels,
+                    'channels_list':self.channels_list,
+                    'chunk_len':self.chunk_len,
+                    'chunk_only_one':self.chunk_only_one}
         # Check cache
+        reload_cache = True
         if os.path.isfile(cache_path):
             # Load cached data
-            self.data_map = torch.load(cache_path)
-        else:
+            print(f'FSProvider: loading cache {cache_path}')
+            self.data_map, setup_map_loaded = torch.load(cache_path)
+            # Check if cache is up to date
+            if setup_map == setup_map_loaded:
+                reload_cache = False
+                print("FSProvider: cache is up to date.")
+            else:
+                reload_cache = True
+                print("FSProvider: cache is out of date. Reloading...")
+        if reload_cache:
             # Preprocess dataset
             print(f'Preprocessing dataset list: {self.data_dir}')
             # Initialize data map
@@ -88,8 +105,8 @@ class FSProvider(TorchDataset):
                     data,label,timestamp=read_file(file_path)
 
                     #Check training mode
-                    if self.training_mode is not None:
-                        if label not in self.training_mode:
+                    if self.training_labels is not None:
+                        if label not in self.training_labels:
                             continue
 
                     # Get length
@@ -118,11 +135,11 @@ class FSProvider(TorchDataset):
                     print(f'Bad file: {file_path}. File must be exported by torch lib.')
             # Check if data_map is empty
             if len(self.data_map) == 0:
-                raise FileExistsError(f"There isn't any data to use in {self.data_dir} (if train_mode is setted, please check data labels).")
+                raise FileExistsError(f"There isn't any data to use in {self.data_dir} (if training_labels is setted, please check data labels).")
             # Save data map
             print(f'Saving dataset list: {cache_path}')
             os.makedirs(self.cache_dir, exist_ok=True)
-            torch.save(self.data_map, cache_path)
+            torch.save((self.data_map,setup_map), cache_path)
     
     def __len__(self):
         return int(len(self.data_map)/self.chunk_rate)
@@ -171,7 +188,7 @@ class RAMProvider(TorchDataset):
     """
     Data provider from RAM
     """
-    def __init__(self, data_dir, chunk_len, chunk_only_one=False, chunk_rate=1, chunk_random_crop=False, chunk_linear_subsample=1, channels_list=None, cache_dir='./Cache', training_mode=None):
+    def __init__(self, data_dir, chunk_len, chunk_only_one=False, chunk_rate=1, chunk_random_crop=False, chunk_linear_subsample=1, channels_list=None, cache_dir='./cache', training_labels=None):
         """
         Args:
         - data_dir (string): path to directory containing files.
@@ -182,7 +199,7 @@ class RAMProvider(TorchDataset):
         - chunk_linear_subsample (int): apply linear subsample to sigle signal, MUST BE POWER OF 2 (1,2,4,8,16,32,64,128...)
         - channel_list (list of int): if not None, select channel (with given index) from data
         - cache_dir (string): path to directory where dataset information are cached
-        - training_mode (list of int): if not None, use only data (with given integer) of normal activity
+        - training_labels (list of int): if not None, use only data (with given integer) of normal activity
         """
 
         # Store args
@@ -190,21 +207,37 @@ class RAMProvider(TorchDataset):
 
         # Get dataset name for cache
         cache_name = os.path.abspath(data_dir).replace('/', '_').replace('\\', '_')
-        cache_name += f'_ram_{chunk_len}_{chunk_only_one}'
-        cache_name += f'_{"all" if  channels_list is None else channels_list}'
+        cache_name += f'_ram_{chunk_len}_{chunk_only_one}_{chunk_rate}_{chunk_random_crop}_{chunk_linear_subsample}'
+        cache_name += f'_label_{"all" if  training_labels is None else "".join(str(l) for l in training_labels).replace(" ", "_")}'
+        cache_name += f'_ch_{"all" if  channels_list is None else "".join(str(c) for c in channel_list).replace(" ", "_")}'
         cache_path = os.path.join(self.cache_dir, cache_name)
 
+        # Create setup map
+        setup_map = {'files':sorted([f for f in os.listdir(data_dir) if os.path.isfile(os.path.join(data_dir, f)) and is_not_hidden(os.path.join(data_dir, f)) and os.path.basename(f)[0] != '.']),
+                    'data_dir':data_dir,
+                    'training_labels':training_labels,
+                    'channels_list':channels_list,
+                    'chunk_len':chunk_len,
+                    'chunk_only_one':chunk_only_one}
         # Check cache
+        reload_cache = True
         if os.path.isfile(cache_path):
             # Load cached data
             print(f'RAMProvider: loading cache {cache_path}')
-            self.data = torch.load(cache_path)
-        else:
+            self.data, setup_map_loaded = torch.load(cache_path)
+            # Check if cache is up to date
+            if setup_map == setup_map_loaded:
+                reload_cache = False
+                print("RAMProvider: cache is up to date.")
+            else:
+                reload_cache = True
+                print("RAMProvider: cache is out of date. Reloading...")
+        if reload_cache:
             print('RAMProvider: reading all files')
             # Initialize data
             self.data = []
             # Create FS provider
-            fs_provider = FSProvider(data_dir, chunk_len=chunk_len, chunk_only_one=chunk_only_one, chunk_rate=chunk_rate, chunk_random_crop=chunk_random_crop, chunk_linear_subsample=chunk_linear_subsample, channels_list=channels_list, cache_dir=cache_dir, training_mode=training_mode)
+            fs_provider = FSProvider(data_dir, chunk_len=chunk_len, chunk_only_one=chunk_only_one, chunk_rate=chunk_rate, chunk_random_crop=chunk_random_crop, chunk_linear_subsample=chunk_linear_subsample, channels_list=channels_list, cache_dir=cache_dir, training_labels=training_labels)
             # Read all files
             for i in tqdm(range(len(fs_provider))):
                 # Get data
@@ -215,7 +248,7 @@ class RAMProvider(TorchDataset):
             # Save data
             print(f'Saving data: {cache_path}')
             os.makedirs(self.cache_dir, exist_ok=True)
-            torch.save(self.data, cache_path)
+            torch.save((self.data,setup_map), cache_path)
     
     def __len__(self):
         return len(self.data)
@@ -226,7 +259,7 @@ class RAMProvider(TorchDataset):
 
 class Dataset(TorchDataset):
     
-    def __init__(self, data_dir, chunk_len, chunk_only_one=False, chunk_rate=1, chunk_random_crop=False, chunk_linear_subsample=1, normalize_params=None, channels_list=None, cache_dir='./Cache', training_mode=None, provider='ram'):
+    def __init__(self, data_dir, chunk_len, chunk_only_one=False, chunk_rate=1, chunk_random_crop=False, chunk_linear_subsample=1, normalize_params=None, channels_list=None, cache_dir='./cache', training_labels=None, provider='ram'):
         """
         Args:
         - data_dir (string): path to directory containing files.
@@ -238,7 +271,7 @@ class Dataset(TorchDataset):
         - chunk_linear_subsample (int): apply linear subsample to sigle signal, MUST BE POWER OF 2 (1,2,4,8,16,32,64,128...)
         - channel_list (list of int): if not None, select channel (with given index) from data
         - cache_dir (string): path to directory where dataset information are cached
-        - training_mode (list of int): if not None, use only data (with given integer) of normal activity
+        - training_labels (list of int): if not None, use only data (with given integer) of normal activity
         - provider ('ram'|'fs'): pre-load data on RAM or load from file system
         """
 
@@ -246,9 +279,9 @@ class Dataset(TorchDataset):
         self.provider = provider
         assert self.provider in ['ram', 'fs'], "Dataset provider must be either 'ram' or 'fs'!"
         if self.provider == 'ram':
-            self.provider = RAMProvider(data_dir, chunk_len=chunk_len, chunk_only_one=chunk_only_one, chunk_rate=chunk_rate, chunk_random_crop=chunk_random_crop, chunk_linear_subsample=chunk_linear_subsample, channels_list=channels_list, cache_dir=cache_dir, training_mode=training_mode)
+            self.provider = RAMProvider(data_dir, chunk_len=chunk_len, chunk_only_one=chunk_only_one, chunk_rate=chunk_rate, chunk_random_crop=chunk_random_crop, chunk_linear_subsample=chunk_linear_subsample, channels_list=channels_list, cache_dir=cache_dir, training_labels=training_labels)
         elif self.provider == 'fs':
-            self.provider = FSProvider(data_dir, chunk_len=chunk_len, chunk_only_one=chunk_only_one, chunk_rate=chunk_rate, chunk_random_crop=chunk_random_crop, chunk_linear_subsample=chunk_linear_subsample, channels_list=channels_list, cache_dir=cache_dir, training_mode=training_mode)
+            self.provider = FSProvider(data_dir, chunk_len=chunk_len, chunk_only_one=chunk_only_one, chunk_rate=chunk_rate, chunk_random_crop=chunk_random_crop, chunk_linear_subsample=chunk_linear_subsample, channels_list=channels_list, cache_dir=cache_dir, training_labels=training_labels)
 
         # Store normalization params
         self.normalize_params = normalize_params

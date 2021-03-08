@@ -3,7 +3,8 @@ from torch.utils.data import Dataset as TorchDataset
 import os
 from tqdm import tqdm
 from random import randint
-from fileReader.readFile import read_file
+from scipy import signal
+from fileReader.readFile import read_file, read_file_info
 
 if os.name=='nt':
     import win32api, win32con
@@ -21,7 +22,7 @@ class FSProvider(TorchDataset):
     """
     Data provider from file system
     """
-    def __init__(self, data_dir, chunk_len, chunk_only_one=False, chunk_rate=1, chunk_random_crop=False, chunk_linear_subsample=1, channels_list=None, cache_dir='./cache', training_labels=None):
+    def __init__(self, data_dir, chunk_len, chunk_only_one=False, chunk_rate=1, chunk_random_crop=False, chunk_linear_subsample=1, chunk_butterworth_lowpass=None, chunk_butterworth_highpass=None, chunk_butterworth_signal_frequency=None, chunk_butterworth_order=2, channels_list=None, cache_dir='./cache', training_labels=None):
         """
         Args:
         - data_dir (string): path to directory containing files.
@@ -30,7 +31,11 @@ class FSProvider(TorchDataset):
         - chunk_rate (int): if chunk_only_one=False, take one chunk every chunk_rate
         - chunk_random_crop (boolean): if chunk_only_one=True, take one chunk randomly in single signal
         - chunk_linear_subsample (int): apply linear subsample to sigle signal, MUST BE A POWER OF 2 (1,2,4,8,16,32,64,128...)
-        - channel_list (list of int): if not None, select channel (with given index) from data
+        - chunk_butterworth_lowpass (int): if not None, apply butterworth low pass filter at chunk_butterworth_lowpass Hz
+        - chunk_butterworth_highpass (int): if not None, apply butterworth high pass filter at chunk_butterworth_highpass Hz
+        - chunk_butterworth_signal_frequency (int): set frequency (Hz) of input signals 
+        - chunk_butterworth_order (int): set order of butterworth filter
+        - channels_list (list of int): if not None, select channel (with given index) from data
         - cache_dir (string): path to directory where dataset information are cached
         - training_labels (list of int): if not None, use only data (with given integer) of normal activity
         """
@@ -46,7 +51,7 @@ class FSProvider(TorchDataset):
         self.channels_list = channels_list
         self.training_labels = training_labels
 
-        #Check linear subsample setup value
+        # Check linear subsample setup value
         if (self.chunk_linear_subsample & (self.chunk_linear_subsample-1)) != 0:
             raise AttributeError("chunk_linear_subsample must be a power of 2!")
         if self.chunk_linear_subsample >= self.chunk_len:
@@ -57,17 +62,30 @@ class FSProvider(TorchDataset):
         self.curr_file_data = None
 
         # List files
-        self.files = sorted([f for f in os.listdir(self.data_dir) if os.path.isfile(os.path.join(self.data_dir, f)) and is_not_hidden(os.path.join(self.data_dir, f)) and os.path.basename(f)[0] != '.'])
+        self.files = sorted([f for f in os.listdir(self.data_dir) if os.path.isfile(os.path.join(self.data_dir, f)) and is_not_hidden(os.path.join(self.data_dir, f)) and os.path.basename(f)[0] is not '.'])
 
         # Check dir
         if len(self.files) == 0:
             raise FileNotFoundError(self.data_dir + " is empty!")
 
+        # Calculate Butterworth filter setup
+        if (chunk_butterworth_highpass is not None) and (chunk_butterworth_lowpass is not None):
+            self.butterworth_sos = signal.butter(chunk_butterworth_order, [chunk_butterworth_highpass/(0.5*chunk_butterworth_signal_frequency), chunk_butterworth_lowpass/(0.5*chunk_butterworth_signal_frequency)], analog=False, btype='bandpass', output='sos')
+        elif chunk_butterworth_highpass is not None:
+            self.butterworth_sos = signal.butter(chunk_butterworth_order, chunk_butterworth_highpass/(0.5*chunk_butterworth_signal_frequency), analog=False, btype='highpass', output='sos')
+        elif chunk_butterworth_lowpass is not None:
+            self.butterworth_sos = signal.butter(chunk_butterworth_order, chunk_butterworth_lowpass/(0.5*chunk_butterworth_signal_frequency), analog=False, btype='lowpass', output='sos')
+        else:
+            self.butterworth_sos = None
+
+        # Get channels name
+        self.channels_name = read_file_info(os.path.join(self.data_dir, self.files[0]), self.channels_list)
+
         # Get dataset name for cache
         cache_name = self.data_dir.replace('/', '_').replace('\\', '_')
         cache_name += f'_fs_{chunk_len}_{chunk_only_one}_{chunk_rate}_{chunk_random_crop}_{chunk_linear_subsample}'
         cache_name += f'_label_{"all" if  training_labels is None else "".join(str(l) for l in training_labels).replace(" ", "_")}'
-        cache_name += f'_ch_{"all" if  channels_list is None else "".join(str(c) for c in channel_list).replace(" ", "_")}'
+        cache_name += f'_ch_{"all" if  channels_list is None else "".join(str(c) for c in channels_list).replace(" ", "_")}'
         cache_path = os.path.join(self.cache_dir, cache_name)
 
         # Create setup map
@@ -76,7 +94,8 @@ class FSProvider(TorchDataset):
                     'training_labels':self.training_labels,
                     'channels_list':self.channels_list,
                     'chunk_len':self.chunk_len,
-                    'chunk_only_one':self.chunk_only_one}
+                    'chunk_only_one':self.chunk_only_one,
+                    'channels_name':self.channels_name}
         # Check cache
         reload_cache = True
         if os.path.isfile(cache_path):
@@ -180,15 +199,22 @@ class FSProvider(TorchDataset):
         
         # Free whole data storage
         chunk = chunk.clone()
+
+        # Apply Butterworth filter
+        if self.butterworth_sos is not None:
+            chunk = torch.tensor(signal.sosfiltfilt(self.butterworth_sos, chunk).copy())
      
         # Return
         return chunk,label_chunk,time_chunk
+    
+    def get_channels_name(self):
+        return self.channels_name
 
 class RAMProvider(TorchDataset):
     """
     Data provider from RAM
     """
-    def __init__(self, data_dir, chunk_len, chunk_only_one=False, chunk_rate=1, chunk_random_crop=False, chunk_linear_subsample=1, channels_list=None, cache_dir='./cache', training_labels=None):
+    def __init__(self, data_dir, chunk_len, chunk_only_one=False, chunk_rate=1, chunk_random_crop=False, chunk_linear_subsample=1, chunk_butterworth_lowpass=None, chunk_butterworth_highpass=None, chunk_butterworth_signal_frequency=None, chunk_butterworth_order=2, channels_list=None, cache_dir='./cache', training_labels=None):
         """
         Args:
         - data_dir (string): path to directory containing files.
@@ -197,7 +223,11 @@ class RAMProvider(TorchDataset):
         - chunk_rate (int): if chunk_only_one=False, take one chunk every chunk_rate
         - chunk_random_crop (boolean): if chunk_only_one=True, take one chunk randomly in single signal
         - chunk_linear_subsample (int): apply linear subsample to sigle signal, MUST BE POWER OF 2 (1,2,4,8,16,32,64,128...)
-        - channel_list (list of int): if not None, select channel (with given index) from data
+        - chunk_butterworth_lowpass (int): if not None, apply butterworth low pass filter at chunk_butterworth_lowpass Hz
+        - chunk_butterworth_highpass (int): if not None, apply butterworth high pass filter at chunk_butterworth_highpass Hz
+        - chunk_butterworth_signal_frequency (int): set frequency (Hz) of input signals 
+        - chunk_butterworth_order (int): set order of butterworth filter
+        - channels_list (list of int): if not None, select channel (with given index) from data
         - cache_dir (string): path to directory where dataset information are cached
         - training_labels (list of int): if not None, use only data (with given integer) of normal activity
         """
@@ -209,7 +239,7 @@ class RAMProvider(TorchDataset):
         cache_name = os.path.abspath(data_dir).replace('/', '_').replace('\\', '_')
         cache_name += f'_ram_{chunk_len}_{chunk_only_one}_{chunk_rate}_{chunk_random_crop}_{chunk_linear_subsample}'
         cache_name += f'_label_{"all" if  training_labels is None else "".join(str(l) for l in training_labels).replace(" ", "_")}'
-        cache_name += f'_ch_{"all" if  channels_list is None else "".join(str(c) for c in channel_list).replace(" ", "_")}'
+        cache_name += f'_ch_{"all" if  channels_list is None else "".join(str(c) for c in channels_list).replace(" ", "_")}'
         cache_path = os.path.join(self.cache_dir, cache_name)
 
         # Create setup map
@@ -218,13 +248,23 @@ class RAMProvider(TorchDataset):
                     'training_labels':training_labels,
                     'channels_list':channels_list,
                     'chunk_len':chunk_len,
-                    'chunk_only_one':chunk_only_one}
+                    'chunk_only_one':chunk_only_one,
+                    'chunk_rate':chunk_rate,
+                    'chunk_random_crop':chunk_random_crop,
+                    'chunk_linear_subsample':chunk_linear_subsample,
+                    'chunk_butterworth_lowpass':chunk_butterworth_lowpass,
+                    'chunk_butterworth_highpass':chunk_butterworth_highpass,
+                    'chunk_butterworth_signal_frequency':chunk_butterworth_signal_frequency,
+                    'chunk_butterworth_order':chunk_butterworth_order}
         # Check cache
         reload_cache = True
         if os.path.isfile(cache_path):
             # Load cached data
             print(f'RAMProvider: loading cache {cache_path}')
             self.data, setup_map_loaded = torch.load(cache_path)
+            # Save channels name and remove it for comparison
+            self.channels_name = setup_map_loaded['channels_name']
+            del setup_map_loaded['channels_name']
             # Check if cache is up to date
             if setup_map == setup_map_loaded:
                 reload_cache = False
@@ -237,14 +277,16 @@ class RAMProvider(TorchDataset):
             # Initialize data
             self.data = []
             # Create FS provider
-            fs_provider = FSProvider(data_dir, chunk_len=chunk_len, chunk_only_one=chunk_only_one, chunk_rate=chunk_rate, chunk_random_crop=chunk_random_crop, chunk_linear_subsample=chunk_linear_subsample, channels_list=channels_list, cache_dir=cache_dir, training_labels=training_labels)
+            fs_provider = FSProvider(data_dir, chunk_len=chunk_len, chunk_only_one=chunk_only_one, chunk_rate=chunk_rate, chunk_random_crop=chunk_random_crop, chunk_linear_subsample=chunk_linear_subsample, chunk_butterworth_lowpass=chunk_butterworth_lowpass, chunk_butterworth_highpass=chunk_butterworth_highpass, chunk_butterworth_signal_frequency=chunk_butterworth_signal_frequency, chunk_butterworth_order=chunk_butterworth_order, channels_list=channels_list, cache_dir=cache_dir, training_labels=training_labels)
             # Read all files
             for i in tqdm(range(len(fs_provider))):
                 # Get data
                 data,label,timestamp = fs_provider[i]
                 # Add to data
                 self.data.append((data,label,timestamp))
-            
+            # Read channels name
+            self.channels_name = fs_provider.get_channels_name()
+            setup_map['channels_name'] = self.channels_name
             # Save data
             print(f'Saving data: {cache_path}')
             os.makedirs(self.cache_dir, exist_ok=True)
@@ -254,12 +296,14 @@ class RAMProvider(TorchDataset):
         return len(self.data)
     
     def __getitem__(self, idx):
-        # Return
         return self.data[idx]
+    
+    def get_channels_name(self):
+        return self.channels_name
 
 class Dataset(TorchDataset):
     
-    def __init__(self, data_dir, chunk_len, chunk_only_one=False, chunk_rate=1, chunk_random_crop=False, chunk_linear_subsample=1, normalize_params=None, channels_list=None, cache_dir='./cache', training_labels=None, provider='ram'):
+    def __init__(self, data_dir, chunk_len, chunk_only_one=False, chunk_rate=1, chunk_random_crop=False, chunk_linear_subsample=1, chunk_butterworth_lowpass=None, chunk_butterworth_highpass=None, chunk_butterworth_signal_frequency=None, chunk_butterworth_order=2, normalize_params=None, channels_list=None, cache_dir='./cache', training_labels=None, provider='ram'):
         """
         Args:
         - data_dir (string): path to directory containing files.
@@ -269,7 +313,11 @@ class Dataset(TorchDataset):
         - chunk_rate (int): if chunk_only_one=False, take one chunk every chunk_rate
         - chunk_random_crop (boolean): if chunk_only_one=True, take one chunk randomly in single signal
         - chunk_linear_subsample (int): apply linear subsample to sigle signal, MUST BE POWER OF 2 (1,2,4,8,16,32,64,128...)
-        - channel_list (list of int): if not None, select channel (with given index) from data
+        - chunk_butterworth_lowpass (int): if not None, apply butterworth low pass filter at chunk_butterworth_lowpass Hz
+        - chunk_butterworth_highpass (int): if not None, apply butterworth high pass filter at chunk_butterworth_highpass Hz
+        - chunk_butterworth_signal_frequency (int): set frequency (Hz) of input signals 
+        - chunk_butterworth_order (int): set order of butterworth filter
+        - channels_list (list of int): if not None, select channel (with given index) from data
         - cache_dir (string): path to directory where dataset information are cached
         - training_labels (list of int): if not None, use only data (with given integer) of normal activity
         - provider ('ram'|'fs'): pre-load data on RAM or load from file system
@@ -279,9 +327,9 @@ class Dataset(TorchDataset):
         self.provider = provider
         assert self.provider in ['ram', 'fs'], "Dataset provider must be either 'ram' or 'fs'!"
         if self.provider == 'ram':
-            self.provider = RAMProvider(data_dir, chunk_len=chunk_len, chunk_only_one=chunk_only_one, chunk_rate=chunk_rate, chunk_random_crop=chunk_random_crop, chunk_linear_subsample=chunk_linear_subsample, channels_list=channels_list, cache_dir=cache_dir, training_labels=training_labels)
+            self.provider = RAMProvider(data_dir, chunk_len=chunk_len, chunk_only_one=chunk_only_one, chunk_rate=chunk_rate, chunk_random_crop=chunk_random_crop, chunk_linear_subsample=chunk_linear_subsample, chunk_butterworth_lowpass=chunk_butterworth_lowpass, chunk_butterworth_highpass=chunk_butterworth_highpass, chunk_butterworth_signal_frequency=chunk_butterworth_signal_frequency, chunk_butterworth_order=chunk_butterworth_order, channels_list=channels_list, cache_dir=cache_dir, training_labels=training_labels)
         elif self.provider == 'fs':
-            self.provider = FSProvider(data_dir, chunk_len=chunk_len, chunk_only_one=chunk_only_one, chunk_rate=chunk_rate, chunk_random_crop=chunk_random_crop, chunk_linear_subsample=chunk_linear_subsample, channels_list=channels_list, cache_dir=cache_dir, training_labels=training_labels)
+            self.provider = FSProvider(data_dir, chunk_len=chunk_len, chunk_only_one=chunk_only_one, chunk_rate=chunk_rate, chunk_random_crop=chunk_random_crop, chunk_linear_subsample=chunk_linear_subsample, chunk_butterworth_lowpass=chunk_butterworth_lowpass, chunk_butterworth_highpass=chunk_butterworth_highpass, chunk_butterworth_signal_frequency=chunk_butterworth_signal_frequency, chunk_butterworth_order=chunk_butterworth_order, channels_list=channels_list, cache_dir=cache_dir, training_labels=training_labels)
 
         # Store normalization params
         self.normalize_params = normalize_params
@@ -311,3 +359,6 @@ class Dataset(TorchDataset):
         
         # Return
         return data_tmp,label,timestamp
+    
+    def get_channels_name(self):
+        return self.provider.get_channels_name()

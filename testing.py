@@ -63,6 +63,10 @@ def parse():
                                             'chunk_rate',
                                             'chunk_random_crop',
                                             'chunk_linear_subsample',
+                                            'chunk_butterworth_lowpass',
+                                            'chunk_butterworth_highpass',
+                                            'chunk_butterworth_signal_frequency',
+                                            'chunk_butterworth_order',
                                             'channels_list',
                                             'batch_size',
                                             'data_provider',
@@ -91,6 +95,10 @@ chunk_only_one: False\n\
 chunk_rate: 1\n\
 chunk_random_crop: False\n\
 chunk_linear_subsample: 1\n\
+chunk_butterworth_lowpass: None\n\
+chunk_butterworth_highpass: None\n\
+chunk_butterworth_signal_frequency: None\n\
+chunk_butterworth_order: 2\n\
 channels_list: None\n\
 batch_size: 128\n\
 data_provider: 'ram'\n\
@@ -113,7 +121,7 @@ web_port: 8988")
     # Return
     return output
 
-def plotSetup(ax, x, y, i_channel, outDATETIME, label_activity, label_eruption, epoch, y_log=False):
+def plotSetup(ax, x, y, channel_name, outDATETIME, label_activity, label_eruption, epoch, y_log=False):
     max_value = y.max().item()
     ax.set_xticks(x)
     ax.set_xticklabels(outDATETIME, rotation=45)
@@ -125,30 +133,31 @@ def plotSetup(ax, x, y, i_channel, outDATETIME, label_activity, label_eruption, 
     if not y_log:
         ax.set(ylabel='Reconstruction distance')
         ax.plot(x,y, color='green')
-        title="Graph CH" + str(i_channel) + f" (epoch {epoch})"
+        if epoch == None:
+            title="Graph CH_" + str(channel_name)
+        else:
+            title="Graph CH_" + str(channel_name) + f" (epoch {epoch})"
     else:
         ax.set(ylabel='Reconstruction distance (LOG scale)')
         ax.plot(x,y, color='dodgerblue')
         ax.set_yscale('log')
-        title="Graph (LOG y-scale) CH" + str(i_channel) + f" (epoch {epoch})"
+        if epoch == None:
+            title="Graph (LOG y-scale) CH_" + str(channel_name)
+        else:
+            title="Graph (LOG y-scale) CH_" + str(channel_name) + f" (epoch {epoch})"
     ax.title.set_text(title)
     print("    In progress 2/2...")
 
-def plotAndSaveGraphs(dist, i_channel, outDATETIME, label_activity, label_eruption, img_location, epoch, dpi=300):
-    # Get channel
-    if (i_channel != ' ALL'):
-        dist_ch = dist[:,i_channel]
-    else:
-        dist_ch = dist.mean(dim=1)
+def plotAndSaveGraphs(dist_ch, channel_name, outDATETIME, label_activity, label_eruption, img_location, epoch, dpi=300):
     x = range(dist_ch.shape[0])
     y = dist_ch
     _, ax = plt.subplots(ncols=2, nrows=1, tight_layout=True)
     # Normal y-scale
     print("Elaborating 1/2...")
-    plotSetup(ax[0], x, y, i_channel, outDATETIME, label_activity, label_eruption, epoch, y_log=False)
+    plotSetup(ax[0], x, y, channel_name, outDATETIME, label_activity, label_eruption, epoch, y_log=False)
     # Log y-scale
     print("Elaborating 2/2...")
-    plotSetup(ax[1], x, y, i_channel, outDATETIME, label_activity, label_eruption, epoch, y_log=True)
+    plotSetup(ax[1], x, y, channel_name, outDATETIME, label_activity, label_eruption, epoch, y_log=True)
     # Show graphs
     print("Saving...")
     plt.legend(loc='upper left', bbox_to_anchor=(1, 1))
@@ -158,7 +167,11 @@ def plotAndSaveGraphs(dist, i_channel, outDATETIME, label_activity, label_erupti
         folder = img_location
     folder = os.path.join(folder, "testing")
     os.makedirs(folder, exist_ok=True)
-    plt.savefig(os.path.join(folder, "CH" + str(i_channel) + f"_epoch{epoch:05d}" + ".png"), dpi=dpi)
+    if epoch == None:
+        name_file = "CH_" + str(channel_name) + ".png"
+    else:
+        name_file = "CH_" + str(channel_name) + f"_epoch{epoch:05d}" + ".png"
+    plt.savefig(os.path.join(folder, name_file), dpi=dpi)
 
 if __name__ == '__main__':
     # Get params
@@ -178,7 +191,7 @@ if __name__ == '__main__':
     normalize_params={"mean":args['mean'], "std":args['std']}
 
     # Instantiate dataset
-    test_dataset = Dataset(args['test_dir'], chunk_len=args['chunk_len'], chunk_only_one=args['chunk_only_one'], chunk_rate=args['chunk_rate'], chunk_random_crop=args['chunk_random_crop'], chunk_linear_subsample=args['chunk_linear_subsample'], normalize_params=normalize_params, channels_list=args['channels_list'], provider=args['data_provider'])
+    test_dataset = Dataset(args['test_dir'], chunk_len=args['chunk_len'], chunk_only_one=args['chunk_only_one'], chunk_rate=args['chunk_rate'], chunk_random_crop=args['chunk_random_crop'], chunk_linear_subsample=args['chunk_linear_subsample'], chunk_butterworth_lowpass=args['chunk_butterworth_lowpass'], chunk_butterworth_highpass=args['chunk_butterworth_highpass'], chunk_butterworth_signal_frequency=args['chunk_butterworth_signal_frequency'], chunk_butterworth_order=args['chunk_butterworth_order'], normalize_params=normalize_params, channels_list=args['channels_list'], provider=args['data_provider'])
     
     # Instantiate loader
     test_loader = data.DataLoader(test_dataset, batch_size=args['batch_size'], shuffle=False, num_workers= 0, drop_last=True)
@@ -236,15 +249,30 @@ if __name__ == '__main__':
     label_activity = [(label in args['label_activity']) for label in outLABEL]
     label_eruption = [(label in args['label_eruption']) for label in outLABEL]
 
+    # Get checkpoint epoch
+    try:
+        epoch = checkpoint_dict['epoch']
+    except(KeyError):
+        print("'Epoch' info not found in checkpoint.")
+        epoch = None
+
     # Plot distance per channel
     print("Showing graphs per CH:")
     for i_channel in range(args['data_channels']):
         print("CHANNEL " + str(i_channel+1) + "/" + str(args['data_channels']) + ":")
-        plotAndSaveGraphs(dist, i_channel, outDATETIME, label_activity, label_eruption, checkpoint, checkpoint_dict['epoch'], args['img_quality'])
+        # Get single channel reconstruction distance
+        dist_ch = dist[:,i_channel]
+        # Get channel name
+        channel_name = test_dataset.get_channels_name()[i_channel]
+        # Plot
+        plotAndSaveGraphs(dist_ch, channel_name, outDATETIME, label_activity, label_eruption, checkpoint, epoch, args['img_quality'])
 
     # Plot total distance
     print("Showing total graphs:")
-    plotAndSaveGraphs(dist, " ALL", outDATETIME, label_activity, label_eruption, checkpoint, checkpoint_dict['epoch'], args['img_quality'])
+    # Get mean of all channel reconstruction distance
+    dist_ch = dist.mean(dim=1)
+    # Plot
+    plotAndSaveGraphs(dist_ch, "ALL", outDATETIME, label_activity, label_eruption, checkpoint, epoch, args['img_quality'])
 
     # Show graph on browser
     print("To view figure, visit http://127.0.0.1:" + str(args['web_port']))

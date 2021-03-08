@@ -47,6 +47,10 @@ def parse():
                                             'chunk_rate',
                                             'chunk_random_crop',
                                             'chunk_linear_subsample',
+                                            'chunk_butterworth_lowpass',
+                                            'chunk_butterworth_highpass',
+                                            'chunk_butterworth_signal_frequency',
+                                            'chunk_butterworth_order',
                                             'channels_list',
                                             'batch_size',
                                             'data_provider',
@@ -58,6 +62,7 @@ def parse():
                                             'plot_every',
                                             'log_every',
                                             'save_every',
+                                            'tensorboard_enable',
                                             'tensorboard_port',
                                             'layers_base',
                                             'channels_base',
@@ -71,10 +76,10 @@ def parse():
                                             'reduce_lr_every',
                                             'reduce_lr_factor',
                                             'weight_decay',
-                                            'resume',
                                             'epochs',
                                             'lr',
-                                            'device']):
+                                            'device',
+                                            'checkpoint']):
                 raise AttributeError("Params consistency broken!")
     except (FileNotFoundError, AttributeError, Exception):
         print("Restoring original params value in the setup file... please try to reconfigure setup.")
@@ -91,6 +96,10 @@ chunk_only_one: False\n\
 chunk_rate: 1\n\
 chunk_random_crop: False\n\
 chunk_linear_subsample: 1\n\
+chunk_butterworth_lowpass: None\n\
+chunk_butterworth_highpass: None\n\
+chunk_butterworth_signal_frequency: None\n\
+chunk_butterworth_order: 2\n\
 channels_list: None\n\
 batch_size: 128\n\
 data_provider: 'ram'\n\
@@ -104,6 +113,7 @@ log_dir: './logs'\n\
 plot_every: 1000\n\
 log_every: 10\n\
 save_every: 10\n\
+tensorboard_enable: True\n\
 tensorboard_port: 6006\n\
 \n\
 # Model options\n\
@@ -121,10 +131,12 @@ optim: 'Adam'\n\
 reduce_lr_every: None\n\
 reduce_lr_factor: 0.1\n\
 weight_decay: 0.0005\n\
-resume: None\n\
 epochs: 32000\n\
 lr: 0.00001\n\
-device: 'cuda'")
+device: 'cuda'\n\
+\n\
+# Checkpoints restore options\n\
+checkpoint: None")
         f.close()
         raise AttributeError("Exit")
 
@@ -139,8 +151,8 @@ if __name__ == '__main__':
     normalize_params={"mean":args['mean'], "std":args['std']}
 
     # Create dataset
-    train_dataset = Dataset(args['train_dir'], chunk_len=args['chunk_len'], chunk_only_one=args['chunk_only_one'], chunk_rate=args['chunk_rate'], chunk_random_crop=args['chunk_random_crop'], chunk_linear_subsample=args['chunk_linear_subsample'], normalize_params=normalize_params, channels_list=args['channels_list'], provider=args['data_provider'], training_labels=args['training_labels'])
-    val_dataset = Dataset(args['val_dir'], chunk_len=args['chunk_len'], chunk_only_one=args['chunk_only_one'], chunk_rate=args['chunk_rate'], chunk_random_crop=args['chunk_random_crop'], chunk_linear_subsample=args['chunk_linear_subsample'], normalize_params=normalize_params, channels_list=args['channels_list'], provider=args['data_provider'])
+    train_dataset = Dataset(args['train_dir'], chunk_len=args['chunk_len'], chunk_only_one=args['chunk_only_one'], chunk_rate=args['chunk_rate'], chunk_random_crop=args['chunk_random_crop'], chunk_linear_subsample=args['chunk_linear_subsample'], chunk_butterworth_lowpass=args['chunk_butterworth_lowpass'], chunk_butterworth_highpass=args['chunk_butterworth_highpass'], chunk_butterworth_signal_frequency=args['chunk_butterworth_signal_frequency'], chunk_butterworth_order=args['chunk_butterworth_order'], normalize_params=normalize_params, channels_list=args['channels_list'], provider=args['data_provider'], training_labels=args['training_labels'])
+    val_dataset = Dataset(args['val_dir'], chunk_len=args['chunk_len'], chunk_only_one=args['chunk_only_one'], chunk_rate=args['chunk_rate'], chunk_random_crop=args['chunk_random_crop'], chunk_linear_subsample=args['chunk_linear_subsample'], chunk_butterworth_lowpass=args['chunk_butterworth_lowpass'], chunk_butterworth_highpass=args['chunk_butterworth_highpass'], chunk_butterworth_signal_frequency=args['chunk_butterworth_signal_frequency'], chunk_butterworth_order=args['chunk_butterworth_order'], normalize_params=normalize_params, channels_list=args['channels_list'], provider=args['data_provider'])
     
      # Save number of channels
     example,_,_ = train_dataset[0]

@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 from tqdm import tqdm
 import torch
@@ -5,6 +6,7 @@ import numpy as np
 from torch.utils.data import DataLoader
 from utils.saver import Saver
 from utils.model import Model
+from threading import Thread
 
 class Trainer:
 
@@ -26,10 +28,6 @@ class Trainer:
                             max_channels = self.args['max_channels'],
                             h_size = self.args['h_size'],
                             enable_variational = self.args['enable_variational'])
-
-        # Check resume
-        if self.args['resume'] is not None:
-            self.net.load_state_dict(Saver.load_state_dict(self.args['resume']))
 
         # Move to device
         self.net.to(self.args['device'])
@@ -58,6 +56,15 @@ class Trainer:
             self.scheduler = torch.optim.lr_scheduler.StepLR(self.optim, self.args['reduce_lr_every'], self.args['reduce_lr_factor'])
         else:
             self.scheduler = None
+
+        # Check if restore checkpoint
+        if self.args['checkpoint'] is not None:
+            # Load checkpoint
+            checkpoint_path = os.path.abspath(args['checkpoint'])
+            checkpoint = Saver.load_checkpoint(checkpoint_path)
+            # Restore checkpoint
+            self.net.load_state_dict(checkpoint['model_state_dict'])
+            self.optim.load_state_dict(checkpoint['optim_state_dict'])
 
         # Compute splits names
         self.splits = list(self.args['datasets'].keys())
@@ -130,7 +137,8 @@ class Trainer:
                         max_rec_dist = max(train_rec_dists)
 
                         # Compute threshold range
-                        dist_thresholds = torch.linspace(0, 2*max_rec_dist, 64).unsqueeze(0).to(self.args['device']) # or (min_rec_dist, max_rec_dist + 2*(max_rec_dist - min_rec_dist), 20)
+                        dist_thresholds = torch.linspace(0, 2*max_rec_dist, 64).unsqueeze(0).to(self.args['device'])
+                        #dist_thresholds = torch.linspace(min_rec_dist, max_rec_dist + 2*(max_rec_dist - min_rec_dist), 20).unsqueeze(0).to(self.args['device'])
                         
                         # Log epoch metrics 
                         for k, v in epoch_metrics.items():
@@ -157,11 +165,11 @@ class Trainer:
 
                 # Save checkpoint
                 if epoch % self.args['save_every'] == 0:
-                    self.saver.save_checkpoint(self.net, metrics, "Model", epoch)
+                    self.saver.save_checkpoint(self.net, self.optim, metrics, "Model", epoch)
 
             except KeyboardInterrupt:
                 print('Caught keyboard interrupt: saving checkpoint...')
-                self.saver.save_checkpoint(self.net, metrics, "Model", epoch)
+                self.saver.save_checkpoint(self.net, self.optim, metrics, "Model", epoch)
                 break
 
             except FloatingPointError as err:
@@ -169,7 +177,7 @@ class Trainer:
                 break
 
         # Save last checkpoint
-        self.saver.save_checkpoint(self.net, metrics, "Model", epoch)
+        self.saver.save_checkpoint(self.net, self.optim, metrics, "Model", epoch)
 
         # Terminate saver
         self.saver.close()
@@ -197,16 +205,9 @@ class Trainer:
             self.optim.step()
 
         # Log outputs and gradients
-        if args['split'] == list(self.args['datasets'].keys())[0] and args['step'] % self.plot_every == 0:
-            # Log output histograms
-            for name,module in self.net.named_modules():
-                if name != '' and hasattr(module, 'last_output'):
-                    # Log histogram
-                    self.saver.dump_histogram(module.last_output, args['step'], 'output ' + name)
-            # Log parameters and gradients 
-            for name,param in self.net.named_parameters():
-                self.saver.dump_histogram(param.grad, args['step'], 'grad ' + name)
-                self.saver.dump_histogram(param.data, args['step'], 'param ' + name)
+        if args['split'] == list(self.args['datasets'].keys())[0] and args['step'] % self.plot_every == 0: # Training Set
+            # Execute dump_histogram in different thread
+            Thread(target = self.print_histogram, args = (self.net.named_modules(), args['step'], self.net.named_parameters(), )).start()
         
         # Compute MAE
         mae = (x - x_rec).abs().mean()
@@ -238,10 +239,9 @@ class Trainer:
 
         # Plot
         if args['step'] % self.plot_every == 0:
-            for index, ch in enumerate(self.ch_list):
-                self.saver.dump_line(x[0,index,:], args['step'], args['split'], 'CH_'+str(ch.item()))
-                self.saver.dump_line(x_rec[0,index,:], args['step'], args['split'], 'CH_'+str(ch.item())+'_reconstruction')
-                
+            # Execute dump_line in different thread
+            Thread(target = self.print_line, args = (self.ch_list, self.args['datasets'], args['step'], args['split'], x, x_rec, )).start()
+
         # Return metrics
         return (x_rec, mu, logvar), metrics
 
@@ -249,3 +249,23 @@ class Trainer:
         # Optimizer scheduler step
         if self.scheduler is not None:
             self.scheduler.step()
+    
+    def print_histogram(self, net_named_modules, args_step, net_named_parameters):
+        # Log output histograms
+        for name,module in net_named_modules:
+            if name != '' and hasattr(module, 'last_output'):
+                # Log histogram
+                self.saver.dump_histogram(module.last_output, args_step, 'output ' + name)
+        # Log parameters and gradients 
+        for name,param in net_named_parameters:
+            self.saver.dump_histogram(param.grad, args_step, 'grad ' + name)
+            self.saver.dump_histogram(param.data, args_step, 'param ' + name)
+
+    def print_line(self, ch_list, args_datasets, args_step, args_split, x, x_rec):
+        # Log output signal reconstruction
+        for index in range(len(self.ch_list)):
+            # Get channel name
+            channel_name = args_datasets[list(args_datasets.keys())[0]].get_channels_name()[index]
+            # Log signal
+            self.saver.dump_line(x[0,index,:], args_step, args_split, 'CH_'+str(channel_name))
+            self.saver.dump_line(x_rec[0,index,:], args_step, args_split, 'CH_'+str(channel_name)+'_reconstruction')

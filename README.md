@@ -6,7 +6,7 @@ The toolkit is developed in Python 3 using the PyTorch library, and is structure
 The root directory contains the following folders:
 - **cache** (internal use): storage directory for internally-processed dataset.
 - **dataset**: directory containing default locations for train/validation/test files. Each directory can contain an arbitrary number of files, each of which must be saved in PyTorch format (using torch.save) in dictionary format, containing the following keys
-  - CHANNEL_NAMES: list of names for each channels,
+  - CHANNELS_NAME: list of name for each channels,
   - TIME_DESC: natural-language description of the temporal interval of represented in the file
   - DATA: float tensor of size “stations × number of signals × chunk length
   - LABEL (optional): 0 for no activity or normal activity, 1 for e.g. mild volcanic activity, 2 for e.g. energetic eruptive activity ; if not provided, non-normal events will not be emphasized during visualization 
@@ -40,7 +40,7 @@ The main files in the toolkit are:
   - data_provider: specifies whether data should be stored on RAM (faster; value “ram”) or should be read from the filesystem (slower; value “fs”); default “ram”
   - mean: if not None, list of per-channel means for standardization; default None
   - std: if not None, list of per-channel standard deviations for standardization; default None
-  - training_labels if not None, list of normal activity labels; default [0], None if only files with label 0 are provided.
+  - training_labels if not None, list of normal activity labels; default [0]
   - tag: name to assign to the training session in the web dashboard
   - log_dir: folder where to save the training data
   - plot_every: defines how often (number of iterations) dashboard figures (inputs, reconstructions) should be updated; default 1000

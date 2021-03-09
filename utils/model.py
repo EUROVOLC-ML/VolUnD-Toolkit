@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+
 class FirstBlock(nn.Module):
     def __init__(self, i, o, k, s, d):
         """
@@ -22,6 +23,7 @@ class FirstBlock(nn.Module):
         x = self.conv(x)
         x = F.relu(x)
         return x
+
 
 class Block(nn.Module):
     def __init__(self, i, o, k, s=1, d=1):
@@ -54,6 +56,7 @@ class Block(nn.Module):
         out = self.relu(out)
         return out
 
+
 class ChangeChannels(nn.Module):
     def __init__(self, i, o, act=True):
         """
@@ -74,6 +77,7 @@ class ChangeChannels(nn.Module):
             x = F.relu(x)
         return x
 
+
 class TransDown(nn.Module):
     def __init__(self, i, o):
         """
@@ -91,6 +95,7 @@ class TransDown(nn.Module):
         x = self.conv(x)
         x = F.relu(x)
         return x
+
 
 class TransUp(nn.Module):
     def __init__(self, i, o):
@@ -110,6 +115,7 @@ class TransUp(nn.Module):
         x = F.relu(x)
         return x
 
+
 class Bottleneck(nn.Module):
     def __init__(self, i, o, reduce):
         """
@@ -125,10 +131,11 @@ class Bottleneck(nn.Module):
         self.reduction_layers = nn.ModuleList()
         curr_channels = i
         while curr_channels//reduce > o:
-            self.reduction_layers.append(ChangeChannels(curr_channels, curr_channels//reduce))
+            self.reduction_layers.append(ChangeChannels(
+                curr_channels, curr_channels//reduce))
             curr_channels //= reduce
         self.out = ChangeChannels(curr_channels, o, False)
-    
+
     def forward(self, x):
         # Reduce channels
         for i in range(len(self.reduction_layers)):
@@ -136,10 +143,11 @@ class Bottleneck(nn.Module):
         # Compute output
         x = self.out(x)
         # Split channels between mu and logvar
-        mu = x[:,:self.o//2,:]
-        logvar = x[:,self.o//2:,:]
+        mu = x[:, :self.o//2, :]
+        logvar = x[:, self.o//2:, :]
         # Return
         return mu, logvar
+
 
 class Model(nn.Module):
     def __init__(self, data_len, data_channels, layers_base, channels_base, min_spatial_size, start_dilation, min_sig_dil_ratio, max_channels, h_size, enable_variational):
@@ -175,7 +183,8 @@ class Model(nn.Module):
 
         # Check data length
         if (self.data_len & (self.data_len-1)) != 0:
-            raise AttributeError('Warning: model expects input to be power of 2 (got {self.data_len})')
+            raise AttributeError(
+                'Warning: model expects input to be power of 2 (got {self.data_len})')
 
         # Track number of channels per block of layers
         layer_channels = []
@@ -187,7 +196,8 @@ class Model(nn.Module):
         curr_dilation = self.start_dilation
 
         # Add encoder first block
-        self.encoder.append(FirstBlock(self.data_channels, curr_channels, 3, 1, curr_dilation))
+        self.encoder.append(FirstBlock(self.data_channels,
+                                       curr_channels, 3, 1, curr_dilation))
 
         # Add encoder blocks
         while curr_data_len > self.min_spatial_size:
@@ -196,16 +206,18 @@ class Model(nn.Module):
             # Add blocks
             for _ in range(self.layers_base):
                 # Add block
-                self.encoder.append(Block(curr_channels, curr_channels, 3, 1, curr_dilation))
+                self.encoder.append(
+                    Block(curr_channels, curr_channels, 3, 1, curr_dilation))
             # Add downsampling block
-            self.encoder.append(TransDown(curr_channels, min(curr_channels*2, self.max_channels)))
+            self.encoder.append(TransDown(curr_channels, min(
+                curr_channels*2, self.max_channels)))
             # Update values
             if curr_channels < self.max_channels:
                 curr_channels *= 2
             curr_data_len /= 2
             while curr_dilation > 1 and curr_data_len/curr_dilation < self.min_sig_dil_ratio:
                 curr_dilation -= 1
-        
+
         # Bottleneck
         self.bottleneck = Bottleneck(curr_channels, self.h_size*2, 4)
 
@@ -227,9 +239,10 @@ class Model(nn.Module):
             self.decoder.append(TransUp(prev_curr_channels, curr_channels))
             # Update values
             curr_data_len *= 2
-        
+
         # Add decoder final block
-        self.decoder.append(ChangeChannels(curr_channels, self.data_channels, False))
+        self.decoder.append(ChangeChannels(
+            curr_channels, self.data_channels, False))
 
         # Create sequential containers
         self.encoder = nn.Sequential(*self.encoder)
@@ -253,10 +266,10 @@ class Model(nn.Module):
             # Reparameterization
             z = self.reparameterize(mu, logvar)
             x = z
-        
+
         # Decoder
         x = self.decoder(x)
-        
+
         # Return
         return x, mu, logvar
 

@@ -1,3 +1,5 @@
+from tqdm import tqdm
+from matplotlib import pyplot as plt
 from datetime import datetime
 import os
 from os.path import getmtime
@@ -12,17 +14,18 @@ import threading
 import webbrowser
 import matplotlib
 matplotlib.use('Agg')
-from matplotlib import pyplot as plt
-from tqdm import tqdm
+
 
 class Saver(object):
     """
     Saver allows for saving and restore networks.
     """
+
     def __init__(self, base_output_dir: Path, args: dict, sub_dirs=('trainingSet', 'validationSet'), tag=''):
 
         # Create experiment directory
-        timestamp_str = datetime.fromtimestamp(time()).strftime('%Y-%m-%d_%H-%M-%S')
+        timestamp_str = datetime.fromtimestamp(
+            time()).strftime('%Y-%m-%d_%H-%M-%S')
         if isinstance(tag, str) and len(tag) > 0:
             # Append tag
             timestamp_str += f"_{tag}"
@@ -52,13 +55,13 @@ class Saver(object):
             args_str = [f'{a}: {v}\n' for a, v in self.args.items()]
             args_str.append(f'exp_name: {timestamp_str}\n')
             f.writelines(sorted(args_str))
-        
+
         # Dump command
         with open(self.path / 'command.txt', mode='wt') as f:
             cmd_args = ' '.join(sys.argv)
             f.write(cmd_args)
             f.write('\n')
-        
+
         # Start TensorBoard Daemon to visualize data
         if args['tensorboard_enable']:
             self.tensorboard_port = args['tensorboard_port']
@@ -88,7 +91,8 @@ class Saver(object):
         fig = plt.figure()
         if isinstance(line, tuple):
             line_x, line_y = line
-            plt.plot(line_x.cpu().detach().numpy(), line_y.cpu().detach().numpy(), fmt)
+            plt.plot(line_x.cpu().detach().numpy(),
+                     line_y.cpu().detach().numpy(), fmt)
         else:
             plt.plot(line.cpu().detach().numpy(), fmt)
         out_path = self.output_path[split] / f'line_{step:08d}_{name}.jpg'
@@ -97,12 +101,19 @@ class Saver(object):
 
     def dump_histogram(self, tensor: torch.Tensor, epoch: int, desc: str):
         try:
-            self.writer.add_histogram(desc, tensor.contiguous().view(-1), epoch)
+            self.writer.add_histogram(
+                desc, tensor.contiguous().view(-1), epoch)
         except:
             print('Error writing histogram')
-    
+
     def dump_metric(self, value: float, epoch: int, *tags):
         self.writer.add_scalar('/'.join(tags), value, epoch)
+
+    def dump_graph(self, net: torch.nn.Module, tensor: torch.Tensor):
+        """
+        Dump model graph into tb.
+        """
+        self.writer.add_graph(net, tensor)
 
     @staticmethod
     def load_hyperparams(hyperparams_path):
@@ -114,7 +125,8 @@ class Saver(object):
         if not hyperparams_path.exists():
             raise OSError('Please provide a valid checkpoints path')
         if hyperparams_path.is_dir():
-            hyperparams_path = os.path.join(hyperparams_path, 'hyperparams.txt')
+            hyperparams_path = os.path.join(
+                hyperparams_path, 'hyperparams.txt')
         # Prepare output
         output = {}
         # Read file
@@ -145,7 +157,8 @@ class Saver(object):
         """
         model_path = Path(model_path)
         if not model_path.exists():
-            raise OSError('Please provide a valid path for restore checkpoint.')
+            raise OSError(
+                'Please provide a valid path for restore checkpoint.')
 
         if model_path.is_dir():
             # Check there are files in that directory
@@ -161,7 +174,7 @@ class Saver(object):
                 print(f'Search best checkpoint (minor loss)...')
             loss = torch.load(file_list[0])['stats']['mse_loss']
             checkpoint = file_list[0]
-            for i in tqdm(range(1,len(file_list))):
+            for i in tqdm(range(1, len(file_list))):
                 loss_tmp = torch.load(file_list[i])['stats']['mse_loss']
                 if loss_tmp < loss:
                     loss = loss_tmp

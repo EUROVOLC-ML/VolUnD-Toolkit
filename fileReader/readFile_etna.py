@@ -2,9 +2,10 @@ import torch
 from datetime import datetime, timedelta
 import scipy.io as sio
 
+
 def read_file(file_path):
     file_name = file_path.split("\\")[-1]
-    
+
     # Read file with same library how it is saved
     data_load = sio.loadmat(file_path)
 
@@ -13,7 +14,8 @@ def read_file(file_path):
 
     # Extract timestamp data from file read
     timestamp = []
-    timestamp.append((datetime.strptime(file_name[0:6], "%y%m%d") + timedelta(minutes=int(file_name[7:10])*10)).timestamp())
+    timestamp.append((datetime.strptime(
+        file_name[0:6], "%y%m%d") + timedelta(minutes=int(file_name[7:10])*10)).timestamp())
 
     # Check if label data exist on file read and extract it or set to 0 (normal activity)
     try:
@@ -23,7 +25,8 @@ def read_file(file_path):
         print("Label not found: assume all events of class 0 (normal)!")
         label = torch.zeros(len(timestamp)).tolist()
 
-    return data,label,timestamp
+    return data, label, timestamp
+
 
 def read_file_info(file_path, channels_list):
     # Read file with same library how it is saved
@@ -35,7 +38,8 @@ def read_file_info(file_path, channels_list):
     except(KeyError):
         print("Channel Name not found.")
         if channels_list is not None:
-            channels_name = [str(channels_list[i].item()) for i in range(channels_list.shape[0])]
+            channels_name = [str(channels_list[i].item())
+                             for i in range(channels_list.shape[0])]
         else:
             tmp = torch.arange(data_load['DATA'].shape[0])
             channels_name = [str(tmp[i].item()) for i in range(tmp.shape[0])]

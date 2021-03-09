@@ -5,6 +5,7 @@
 # Dataset options
 train_dir: './dataset/trainingSet'
 val_dir: './dataset/validationSet'
+data_location: 'path/to/data/'
 chunk_len: 512
 chunk_only_one: False
 chunk_rate: 1

@@ -6,6 +6,7 @@ from torch.utils.data import Subset
 from utils.dataset import Dataset
 from utils.trainer import Trainer
 
+
 def parse():
     """
     Load args from file. Tries to convert them to best type.
@@ -41,45 +42,46 @@ def parse():
 
             # Verify setup integrity
             if not all(key in output.keys() for key in ['train_dir',
-                                            'val_dir',
-                                            'chunk_len',
-                                            'chunk_only_one',
-                                            'chunk_rate',
-                                            'chunk_random_crop',
-                                            'chunk_linear_subsample',
-                                            'chunk_butterworth_lowpass',
-                                            'chunk_butterworth_highpass',
-                                            'chunk_butterworth_signal_frequency',
-                                            'chunk_butterworth_order',
-                                            'channels_list',
-                                            'batch_size',
-                                            'data_provider',
-                                            'mean',
-                                            'std',
-                                            'training_labels',
-                                            'tag',
-                                            'log_dir',
-                                            'plot_every',
-                                            'log_every',
-                                            'save_every',
-                                            'tensorboard_enable',
-                                            'tensorboard_port',
-                                            'layers_base',
-                                            'channels_base',
-                                            'min_spatial_size',
-                                            'start_dilation',
-                                            'min_sig_dil_ratio',
-                                            'max_channels',
-                                            'h_size',
-                                            'enable_variational',
-                                            'optim',
-                                            'reduce_lr_every',
-                                            'reduce_lr_factor',
-                                            'weight_decay',
-                                            'epochs',
-                                            'lr',
-                                            'device',
-                                            'checkpoint']):
+                                                        'val_dir',
+                                                        'data_location',
+                                                        'chunk_len',
+                                                        'chunk_only_one',
+                                                        'chunk_rate',
+                                                        'chunk_random_crop',
+                                                        'chunk_linear_subsample',
+                                                        'chunk_butterworth_lowpass',
+                                                        'chunk_butterworth_highpass',
+                                                        'chunk_butterworth_signal_frequency',
+                                                        'chunk_butterworth_order',
+                                                        'channels_list',
+                                                        'batch_size',
+                                                        'data_provider',
+                                                        'mean',
+                                                        'std',
+                                                        'training_labels',
+                                                        'tag',
+                                                        'log_dir',
+                                                        'plot_every',
+                                                        'log_every',
+                                                        'save_every',
+                                                        'tensorboard_enable',
+                                                        'tensorboard_port',
+                                                        'layers_base',
+                                                        'channels_base',
+                                                        'min_spatial_size',
+                                                        'start_dilation',
+                                                        'min_sig_dil_ratio',
+                                                        'max_channels',
+                                                        'h_size',
+                                                        'enable_variational',
+                                                        'optim',
+                                                        'reduce_lr_every',
+                                                        'reduce_lr_factor',
+                                                        'weight_decay',
+                                                        'epochs',
+                                                        'lr',
+                                                        'device',
+                                                        'checkpoint']):
                 raise AttributeError("Params consistency broken!")
     except (FileNotFoundError, AttributeError, Exception):
         print("Restoring original params value in the setup file... please try to reconfigure setup.")
@@ -91,6 +93,7 @@ def parse():
 # Dataset options\n\
 train_dir: './dataset/trainingSet'\n\
 val_dir: './dataset/validationSet'\n\
+data_location: './path/to/data/'\n\
 chunk_len: 512\n\
 chunk_only_one: False\n\
 chunk_rate: 1\n\
@@ -143,28 +146,33 @@ checkpoint: None")
     # Return
     return output
 
+
 if __name__ == '__main__':
     # Get params
     args = parse()
-    
+
     # Normalization
-    normalize_params={"mean":args['mean'], "std":args['std']}
+    normalize_params = {"mean": args['mean'], "std": args['std']}
 
     # Create dataset
-    train_dataset = Dataset(args['train_dir'], chunk_len=args['chunk_len'], chunk_only_one=args['chunk_only_one'], chunk_rate=args['chunk_rate'], chunk_random_crop=args['chunk_random_crop'], chunk_linear_subsample=args['chunk_linear_subsample'], chunk_butterworth_lowpass=args['chunk_butterworth_lowpass'], chunk_butterworth_highpass=args['chunk_butterworth_highpass'], chunk_butterworth_signal_frequency=args['chunk_butterworth_signal_frequency'], chunk_butterworth_order=args['chunk_butterworth_order'], normalize_params=normalize_params, channels_list=args['channels_list'], provider=args['data_provider'], training_labels=args['training_labels'])
-    val_dataset = Dataset(args['val_dir'], chunk_len=args['chunk_len'], chunk_only_one=args['chunk_only_one'], chunk_rate=args['chunk_rate'], chunk_random_crop=args['chunk_random_crop'], chunk_linear_subsample=args['chunk_linear_subsample'], chunk_butterworth_lowpass=args['chunk_butterworth_lowpass'], chunk_butterworth_highpass=args['chunk_butterworth_highpass'], chunk_butterworth_signal_frequency=args['chunk_butterworth_signal_frequency'], chunk_butterworth_order=args['chunk_butterworth_order'], normalize_params=normalize_params, channels_list=args['channels_list'], provider=args['data_provider'])
-    
-     # Save number of channels
-    example,_,_ = train_dataset[0]
-    args['data_channels'] = example.shape[0] # 0=channel, 1=chunk
+    train_dataset = Dataset(args['train_dir'], data_location=args['data_location'], chunk_len=args['chunk_len'], chunk_only_one=args['chunk_only_one'], chunk_rate=args['chunk_rate'], chunk_random_crop=args['chunk_random_crop'], chunk_linear_subsample=args['chunk_linear_subsample'], chunk_butterworth_lowpass=args['chunk_butterworth_lowpass'],
+                            chunk_butterworth_highpass=args['chunk_butterworth_highpass'], chunk_butterworth_signal_frequency=args['chunk_butterworth_signal_frequency'], chunk_butterworth_order=args['chunk_butterworth_order'], normalize_params=normalize_params, channels_list=args['channels_list'], provider=args['data_provider'], training_labels=args['training_labels'])
+    val_dataset = Dataset(args['val_dir'], data_location=args['data_location'], chunk_len=args['chunk_len'], chunk_only_one=args['chunk_only_one'], chunk_rate=args['chunk_rate'], chunk_random_crop=args['chunk_random_crop'], chunk_linear_subsample=args['chunk_linear_subsample'], chunk_butterworth_lowpass=args['chunk_butterworth_lowpass'],
+                          chunk_butterworth_highpass=args['chunk_butterworth_highpass'], chunk_butterworth_signal_frequency=args['chunk_butterworth_signal_frequency'], chunk_butterworth_order=args['chunk_butterworth_order'], normalize_params=normalize_params, channels_list=args['channels_list'], provider=args['data_provider'])
+
+    # Save number of channels
+    example, _, _ = train_dataset[0]
+    args['data_channels'] = example.shape[0]  # 0=channel, 1=chunk
     if(args['channels_list'] is None):
         args['channels_list'] = torch.arange(args['data_channels'])
     else:
-        args['channels_list'] = torch.tensor(args['channels_list'], dtype=torch.int32)
+        args['channels_list'] = torch.tensor(
+            args['channels_list'], dtype=torch.int32)
     print("Channels: " + str(args['channels_list'].numpy()))
-    
+
     # Setup dataset dictionary
-    args['datasets'] = {'trainingSet': train_dataset, 'validationSet': val_dataset}
+    args['datasets'] = {'trainingSet': train_dataset,
+                        'validationSet': val_dataset}
 
     # Define trainer
     trainer = Trainer(args)

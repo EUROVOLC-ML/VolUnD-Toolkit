@@ -8,40 +8,44 @@ from utils.saver import Saver
 from utils.model import Model
 from threading import Thread
 
+
 class Trainer:
 
     def __init__(self, args):
         # Store args
         self.args = args
-        
+
         # Setup saver
-        self.saver = Saver(Path(self.args['log_dir']), self.args, sub_dirs=list(self.args['datasets'].keys()), tag=self.args['tag'])
+        self.saver = Saver(Path(self.args['log_dir']), self.args, sub_dirs=list(
+            self.args['datasets'].keys()), tag=self.args['tag'])
 
         # Setup model
-        self.net = Model(data_len = int(self.args['chunk_len'] / self.args['chunk_linear_subsample']),
-                            data_channels = self.args['data_channels'],
-                            layers_base = self.args['layers_base'],
-                            channels_base = self.args['channels_base'],
-                            min_spatial_size = self.args['min_spatial_size'],
-                            start_dilation = self.args['start_dilation'],
-                            min_sig_dil_ratio = self.args['min_sig_dil_ratio'],
-                            max_channels = self.args['max_channels'],
-                            h_size = self.args['h_size'],
-                            enable_variational = self.args['enable_variational'])
+        self.net = Model(data_len=int(self.args['chunk_len'] / self.args['chunk_linear_subsample']),
+                         data_channels=self.args['data_channels'],
+                         layers_base=self.args['layers_base'],
+                         channels_base=self.args['channels_base'],
+                         min_spatial_size=self.args['min_spatial_size'],
+                         start_dilation=self.args['start_dilation'],
+                         min_sig_dil_ratio=self.args['min_sig_dil_ratio'],
+                         max_channels=self.args['max_channels'],
+                         h_size=self.args['h_size'],
+                         enable_variational=self.args['enable_variational'])
 
         # Move to device
         self.net.to(self.args['device'])
 
         # Add network to params
         self.args['net'] = str(self.net)
-        self.args[f'{self.net}_parameters'] = np.sum([p.numel() for p in self.net.parameters()])
+        self.args[f'{self.net}_parameters'] = np.sum(
+            [p.numel() for p in self.net.parameters()])
 
         # Store args
         self.ch_list = self.args['channels_list']
         self.plot_every = self.args['plot_every']
 
         # Optimizer params
-        optim_params = {'lr': self.args['lr'], 'weight_decay': self.args['weight_decay']}
+        optim_params = {'lr': self.args['lr'],
+                        'weight_decay': self.args['weight_decay']}
         if self.args['optim'] == 'Adam':
             optim_params = {**optim_params, 'betas': (0.5, 0.999)}
         elif self.args['optim'] == 'SGD':
@@ -53,7 +57,8 @@ class Trainer:
 
         # Configure LR scheduler
         if self.args['optim'] == 'SGD' and self.args['reduce_lr_every'] is not None:
-            self.scheduler = torch.optim.lr_scheduler.StepLR(self.optim, self.args['reduce_lr_every'], self.args['reduce_lr_factor'])
+            self.scheduler = torch.optim.lr_scheduler.StepLR(
+                self.optim, self.args['reduce_lr_every'], self.args['reduce_lr_factor'])
         else:
             self.scheduler = None
 
@@ -69,7 +74,8 @@ class Trainer:
         self.splits = list(self.args['datasets'].keys())
 
         # Setup data loader
-        self.loaders = {s: DataLoader(self.args['datasets'][s], batch_size=self.args['batch_size'], shuffle=(s == list(self.args['datasets'].keys())[0]), num_workers= 0, drop_last=True) for s in self.splits}
+        self.loaders = {s: DataLoader(self.args['datasets'][s], batch_size=self.args['batch_size'], shuffle=(
+            s == list(self.args['datasets'].keys())[0]), num_workers=0, drop_last=True) for s in self.splits}
 
     def train(self):
         # Initialize output metrics
@@ -88,7 +94,7 @@ class Trainer:
                     epoch_metrics = {}
 
                     # Train: Initialize training reconstruction distances
-                    if split == list(self.args['datasets'].keys())[0]: # Training Set
+                    if split == list(self.args['datasets'].keys())[0]:  # Training Set
                         train_rec_dists = []
 
                     # Process each batch
@@ -106,7 +112,8 @@ class Trainer:
 
                         args_trainer['step'] = (epoch * len(dl)) + batch_idx
                         args_trainer['split'] = split
-                        out,metrics = self.__forward_batch(x, label, args_trainer)
+                        out, metrics = self.__forward_batch(
+                            x, label, args_trainer)
 
                         # Check NaN
                         if torch.isnan(out[0]).all():
@@ -116,55 +123,72 @@ class Trainer:
                                 print('Warning: Found NaN values')
 
                         # Training
-                        if split == list(self.args['datasets'].keys())[0]: # Training Set
+                        # Training Set
+                        if split == list(self.args['datasets'].keys())[0]:
                             # Keep track of reconstruction distance
                             train_rec_dists.append(metrics['rec_dist'])
 
-                        # Log metrics 
+                        # Log metrics
                         for k, v in metrics.items():
-                            epoch_metrics[k] = epoch_metrics[k] + [v] if k in epoch_metrics else [v]
+                            epoch_metrics[k] = epoch_metrics[k] + \
+                                [v] if k in epoch_metrics else [v]
 
                             # Check tensorboard
                             if args_trainer['step'] % self.args['log_every'] == 0 and not isinstance(v, torch.Tensor):
-                                self.saver.dump_metric(v, args_trainer['step'], split, k, 'batch')
+                                self.saver.dump_metric(
+                                    v, args_trainer['step'], split, k, 'batch')
+
+                        # Dump model graph
+                        #if epoch == 1:
+                            #self.saver.dump_graph(self.net, x)
 
                     # End epoch, training: estimate thresholds from reconstruction distance
                     self.__end_epoch()
-                    if split == list(self.args['datasets'].keys())[0]: # Training Set
+                    if split == list(self.args['datasets'].keys())[0]:  # Training Set
                         # Get stats
                         min_rec_dist = min(train_rec_dists)
                         max_rec_dist = max(train_rec_dists)
 
                         # Compute threshold range
-                        dist_thresholds = torch.linspace(0, 2*max_rec_dist, 64).unsqueeze(0).to(self.args['device'])
+                        dist_thresholds = torch.linspace(
+                            0, 2*max_rec_dist, 64).unsqueeze(0).to(self.args['device'])
                         #dist_thresholds = torch.linspace(min_rec_dist, max_rec_dist + 2*(max_rec_dist - min_rec_dist), 20).unsqueeze(0).to(self.args['device'])
-                        
-                        # Log epoch metrics 
+
+                        # Log epoch metrics
                         for k, v in epoch_metrics.items():
                             # Compute epoch average
                             avg_v = sum(v)/len(v)
                             # Dump to saver
-                            self.saver.dump_metric(avg_v, epoch, split, k, 'epoch')
+                            self.saver.dump_metric(
+                                avg_v, epoch, split, k, 'epoch')
                             # Add to output results
-                            result_metrics[split][k] = result_metrics[split][k] + [avg_v] if k in result_metrics[split] else [avg_v]
+                            result_metrics[split][k] = result_metrics[split][k] + \
+                                [avg_v] if k in result_metrics[split] else [avg_v]
 
                     # End epoch, val: compute TPR and FPR
-                    elif split == list(self.args['datasets'].keys())[1]: # Validation Set
+                    # Validation Set
+                    elif split == list(self.args['datasets'].keys())[1]:
                         # Compute TPR and FPR
-                        tpr_num = torch.cat([x.unsqueeze(0) for x in epoch_metrics['tp']], 0).sum(0).float()
-                        tpr_den = torch.cat([x.unsqueeze(0) for x in epoch_metrics['tp'] + epoch_metrics['fn']], 0).sum(0).float()
+                        tpr_num = torch.cat(
+                            [x.unsqueeze(0) for x in epoch_metrics['tp']], 0).sum(0).float()
+                        tpr_den = torch.cat([x.unsqueeze(
+                            0) for x in epoch_metrics['tp'] + epoch_metrics['fn']], 0).sum(0).float()
                         tpr = tpr_num/tpr_den
                         tpr[tpr_den == 0] = 0
-                        fpr_num = torch.cat([x.unsqueeze(0) for x in epoch_metrics['fp']], 0).sum(0).float()
-                        fpr_den = torch.cat([x.unsqueeze(0) for x in epoch_metrics['fp'] + epoch_metrics['tn']], 0).sum(0).float()
+                        fpr_num = torch.cat(
+                            [x.unsqueeze(0) for x in epoch_metrics['fp']], 0).sum(0).float()
+                        fpr_den = torch.cat([x.unsqueeze(
+                            0) for x in epoch_metrics['fp'] + epoch_metrics['tn']], 0).sum(0).float()
                         fpr = fpr_num/fpr_den
                         fpr[fpr_den == 0] = 0
                         # Add ROC curve
-                        self.saver.dump_line((fpr, tpr), epoch, split, 'ROC', 'o')
+                        self.saver.dump_line(
+                            (fpr, tpr), epoch, split, 'ROC', 'o')
 
                 # Save checkpoint
                 if epoch % self.args['save_every'] == 0:
-                    self.saver.save_checkpoint(self.net, metrics, "Model", epoch)
+                    self.saver.save_checkpoint(
+                        self.net, metrics, "Model", epoch)
 
             except KeyboardInterrupt:
                 print('Caught keyboard interrupt: saving checkpoint...')
@@ -186,28 +210,30 @@ class Trainer:
 
     def __forward_batch(self, x, label, args):
         # Set network mode
-        if args['split'] == list(self.args['datasets'].keys())[0]: # Training Set
+        if args['split'] == list(self.args['datasets'].keys())[0]:  # Training Set
             self.net.train()
             torch.set_grad_enabled(True)
         else:
             self.net.eval()
             torch.set_grad_enabled(False)
-        
+
         # Compute loss
         x_rec, mu, logvar = self.net(x)
         mse_loss = self.net.loss(x_rec, x, mu, logvar)
 
         # Optimize
-        if args['split'] == list(self.args['datasets'].keys())[0]: # Training Set
+        if args['split'] == list(self.args['datasets'].keys())[0]:  # Training Set
             self.optim.zero_grad()
             mse_loss.backward()
             self.optim.step()
 
         # Log outputs and gradients
-        if args['split'] == list(self.args['datasets'].keys())[0] and args['step'] % self.plot_every == 0: # Training Set
+        # Training Set
+        if args['split'] == list(self.args['datasets'].keys())[0] and args['step'] % self.plot_every == 0:
             # Execute dump_histogram in different thread
-            Thread(target = self.print_histogram, args = (self.net.named_modules(), args['step'], self.net.named_parameters(), )).start()
-        
+            Thread(target=self.print_histogram, args=(
+                self.net.named_modules(), args['step'], self.net.named_parameters(), )).start()
+
         # Compute MAE
         mae = (x - x_rec).abs().mean()
 
@@ -229,7 +255,7 @@ class Trainer:
             # Compute predictions at different thresholds
             preds = (rec_dist > dist_thresholds).type(label.type())
             # Expand label for broadcast
-            label = label.unsqueeze(1).expand_as(preds) 
+            label = label.unsqueeze(1).expand_as(preds)
             # Compute TP, FP, TN, FN for each threshold
             metrics['tp'] = (preds*label).sum(0)
             metrics['fp'] = (preds*(1-label)).sum(0)
@@ -239,7 +265,8 @@ class Trainer:
         # Plot
         if args['step'] % self.plot_every == 0:
             # Execute dump_line in different thread
-            Thread(target = self.print_line, args = (self.ch_list, self.args['datasets'], args['step'], args['split'], x, x_rec, )).start()
+            Thread(target=self.print_line, args=(
+                self.ch_list, self.args['datasets'], args['step'], args['split'], x, x_rec, )).start()
 
         # Return metrics
         return (x_rec, mu, logvar), metrics
@@ -248,15 +275,16 @@ class Trainer:
         # Optimizer scheduler step
         if self.scheduler is not None:
             self.scheduler.step()
-    
+
     def print_histogram(self, net_named_modules, args_step, net_named_parameters):
         # Log output histograms
-        for name,module in net_named_modules:
+        for name, module in net_named_modules:
             if name != '' and hasattr(module, 'last_output'):
                 # Log histogram
-                self.saver.dump_histogram(module.last_output, args_step, 'output ' + name)
-        # Log parameters and gradients 
-        for name,param in net_named_parameters:
+                self.saver.dump_histogram(
+                    module.last_output, args_step, 'output ' + name)
+        # Log parameters and gradients
+        for name, param in net_named_parameters:
             self.saver.dump_histogram(param.grad, args_step, 'grad ' + name)
             self.saver.dump_histogram(param.data, args_step, 'param ' + name)
 
@@ -264,7 +292,10 @@ class Trainer:
         # Log output signal reconstruction
         for index in range(len(self.ch_list)):
             # Get channel name
-            channel_name = args_datasets[list(args_datasets.keys())[0]].get_channels_name()[index]
+            channel_name = args_datasets[list(args_datasets.keys())[
+                0]].get_channels_name()[index]
             # Log signal
-            self.saver.dump_line(x[0,index,:], args_step, args_split, 'CH_'+str(channel_name))
-            self.saver.dump_line(x_rec[0,index,:], args_step, args_split, 'CH_'+str(channel_name)+'_reconstruction')
+            self.saver.dump_line(x[0, index, :], args_step,
+                                 args_split, 'CH_'+str(channel_name))
+            self.saver.dump_line(
+                x_rec[0, index, :], args_step, args_split, 'CH_'+str(channel_name)+'_reconstruction')

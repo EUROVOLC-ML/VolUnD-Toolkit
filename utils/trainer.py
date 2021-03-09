@@ -64,7 +64,6 @@ class Trainer:
             checkpoint = Saver.load_checkpoint(checkpoint_path)
             # Restore checkpoint
             self.net.load_state_dict(checkpoint['model_state_dict'])
-            self.optim.load_state_dict(checkpoint['optim_state_dict'])
 
         # Compute splits names
         self.splits = list(self.args['datasets'].keys())
@@ -165,11 +164,11 @@ class Trainer:
 
                 # Save checkpoint
                 if epoch % self.args['save_every'] == 0:
-                    self.saver.save_checkpoint(self.net, self.optim, metrics, "Model", epoch)
+                    self.saver.save_checkpoint(self.net, metrics, "Model", epoch)
 
             except KeyboardInterrupt:
                 print('Caught keyboard interrupt: saving checkpoint...')
-                self.saver.save_checkpoint(self.net, self.optim, metrics, "Model", epoch)
+                self.saver.save_checkpoint(self.net, metrics, "Model", epoch)
                 break
 
             except FloatingPointError as err:
@@ -177,7 +176,7 @@ class Trainer:
                 break
 
         # Save last checkpoint
-        self.saver.save_checkpoint(self.net, self.optim, metrics, "Model", epoch)
+        self.saver.save_checkpoint(self.net, metrics, "Model", epoch)
 
         # Terminate saver
         self.saver.close()

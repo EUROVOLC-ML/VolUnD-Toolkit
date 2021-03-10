@@ -38,7 +38,7 @@ def read_file_info(file_path, channels_list):
     except(KeyError):
         print("Channel Name not found.")
         if channels_list is not None:
-            channels_name = [str(channels_list[i].item())
+            channels_name = [str(channels_list[i])
                              for i in range(channels_list.shape[0])]
         else:
             tmp = torch.arange(data_load['DATA'].shape[0])

@@ -79,7 +79,7 @@ class FSProvider(TorchDataset):
                     for line in infile:
                         file_list.append(line)
             elif self.data_dir.lower().endswith('.json'):
-                print("json")
+                raise NotImplementedError("JSON import not yet implemented!")
             else:
                 raise AttributeError("Broken file list")
 
@@ -286,7 +286,7 @@ class RAMProvider(TorchDataset):
                     for line in infile:
                         file_list.append(line)
             elif data_dir.lower().endswith('.json'):
-                print("json")
+                raise NotImplementedError("JSON import not yet implemented!")
             else:
                 raise AttributeError("Broken file list")
 

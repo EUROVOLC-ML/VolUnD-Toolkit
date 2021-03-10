@@ -18,6 +18,26 @@ class Trainer:
         # Setup saver
         self.saver = Saver(Path(self.args['log_dir']), self.args, sub_dirs=list(
             self.args['datasets'].keys()), tag=self.args['tag'])
+        
+        # Check if restore checkpoint
+        if self.args['checkpoint'] is not None:
+            # Load checkpoint
+            checkpoint_path = os.path.abspath(args['checkpoint'])
+            checkpoint = Saver.load_checkpoint(checkpoint_path)
+            hyperparams = Saver.load_hyperparams(checkpoint_path)
+            # Restore model setup
+            if (self.args['chunk_len'] != hyperparams['chunk_len']) or (self.args['chunk_linear_subsample'] != hyperparams['chunk_linear_subsample']) or (self.args['data_channels'] != hyperparams['data_channels']):
+                raise ImportError("Can't restore model checkpoint because it's incompatible with given setup!")
+            print("Restore model setup from checkpoint (model setup section of training_setup.txt is ignored).")
+            self.args['layers_base'] = hyperparams['layers_base']
+            self.args['channels_base'] = hyperparams['channels_base']
+            self.args['min_spatial_size'] = hyperparams['min_spatial_size']
+            self.args['start_dilation'] = hyperparams['start_dilation']
+            self.args['min_sig_dil_ratio'] = hyperparams['min_sig_dil_ratio']
+            self.args['max_channels'] = hyperparams['max_channels']
+            self.args['h_size'] = hyperparams['h_size']
+            self.args['enable_variational'] = hyperparams['enable_variational']
+                
 
         # Setup model
         self.net = Model(data_len=int(self.args['chunk_len'] / self.args['chunk_linear_subsample']),
@@ -64,9 +84,6 @@ class Trainer:
 
         # Check if restore checkpoint
         if self.args['checkpoint'] is not None:
-            # Load checkpoint
-            checkpoint_path = os.path.abspath(args['checkpoint'])
-            checkpoint = Saver.load_checkpoint(checkpoint_path)
             # Restore checkpoint
             self.net.load_state_dict(checkpoint['model_state_dict'])
 

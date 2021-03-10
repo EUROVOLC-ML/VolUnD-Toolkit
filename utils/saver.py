@@ -65,9 +65,11 @@ class Saver(object):
         # Start TensorBoard Daemon to visualize data
         if args['tensorboard_enable']:
             self.tensorboard_port = args['tensorboard_port']
-            t = threading.Thread(target=lambda: os.system('tensorboard --logdir=' + str(self.path) + ' --port=' + str(self.tensorboard_port) + ' --bind_all'))
+            t = threading.Thread(target=lambda: os.system('tensorboard --logdir=' + str(
+                self.path) + ' --port=' + str(self.tensorboard_port) + ' --bind_all'))
             t.start()
-            webbrowser.open('http://localhost:' + str(self.tensorboard_port) + '/', new=1)
+            webbrowser.open('http://localhost:' +
+                            str(self.tensorboard_port) + '/', new=1)
 
     def save_checkpoint(self, net: torch.nn.Module, stats: dict, name: str, epoch: int):
         """
@@ -76,10 +78,11 @@ class Saver(object):
         # Get state dict
         model_state_dict = net.state_dict()
         # Copy to CPU
-        for k,v in model_state_dict.items():
+        for k, v in model_state_dict.items():
             model_state_dict[k] = v.cpu()
         # Save
-        torch.save({'model_state_dict':model_state_dict,'stats':stats,'epoch':epoch}, self.ckpt_path / f'{name}_{epoch:05d}.pth')
+        torch.save({'model_state_dict': model_state_dict, 'stats': stats,
+                    'epoch': epoch}, self.ckpt_path / f'{name}_{epoch:05d}.pth')
 
     def dump_line(self, line, step, split, name, fmt=''):
         """

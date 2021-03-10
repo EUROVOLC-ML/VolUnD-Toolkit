@@ -157,19 +157,21 @@ class FSProvider(TorchDataset):
                     # Read file
                     data, label, timestamp = read_file(file)
 
+                    label_list = []
                     # Check training mode
                     if self.training_labels is not None:
-                        if label not in self.training_labels:
-                            continue
-
-                    # Get length
-                    length = data.shape[1]
-                    sublenght = data.shape[2]
+                        for i in range(len(label)):
+                            if label[i] in self.training_labels:
+                                label_list.append(i)
 
                     # Get only selected channels
                     if self.channels_list is not None:
                         # channel can be a list
-                        data = data[self.channels_list, :, :]
+                        data = data[self.channels_list, label_list, :]
+
+                    # Get length
+                    length = data.shape[1]
+                    sublenght = data.shape[2]
 
                     # Compute chunk starts
                     chunk_starts = range(0, length, 1)

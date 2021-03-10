@@ -18,7 +18,7 @@ class Trainer:
         # Setup saver
         self.saver = Saver(Path(self.args['log_dir']), self.args, sub_dirs=list(
             self.args['datasets'].keys()), tag=self.args['tag'])
-        
+
         # Check if restore checkpoint
         if self.args['checkpoint'] is not None:
             # Load checkpoint
@@ -27,8 +27,10 @@ class Trainer:
             hyperparams = Saver.load_hyperparams(checkpoint_path)
             # Restore model setup
             if (self.args['chunk_len'] != hyperparams['chunk_len']) or (self.args['chunk_linear_subsample'] != hyperparams['chunk_linear_subsample']) or (self.args['data_channels'] != hyperparams['data_channels']):
-                raise ImportError("Can't restore model checkpoint because it's incompatible with given setup!")
-            print("Restore model setup from checkpoint (model setup section of training_setup.txt is ignored).")
+                raise ImportError(
+                    "Can't restore model checkpoint because it's incompatible with given setup!")
+            print(
+                "Restore model setup from checkpoint (model setup section of training_setup.txt is ignored).")
             self.args['layers_base'] = hyperparams['layers_base']
             self.args['channels_base'] = hyperparams['channels_base']
             self.args['min_spatial_size'] = hyperparams['min_spatial_size']
@@ -37,7 +39,6 @@ class Trainer:
             self.args['max_channels'] = hyperparams['max_channels']
             self.args['h_size'] = hyperparams['h_size']
             self.args['enable_variational'] = hyperparams['enable_variational']
-                
 
         # Setup model
         self.net = Model(data_len=int(self.args['chunk_len'] / self.args['chunk_linear_subsample']),
@@ -92,7 +93,10 @@ class Trainer:
 
         # Setup data loader
         self.loaders = {s: DataLoader(self.args['datasets'][s], batch_size=self.args['batch_size'], shuffle=(
-            s == list(self.args['datasets'].keys())[0]), num_workers=0, drop_last=True) for s in self.splits}
+            s == self.splits[0]), num_workers=0, drop_last=True) for s in self.splits}
+        # Dump model graph
+        self.saver.dump_graph(self.net, next(iter(self.loaders[self.splits[0]]))[
+                              0].to(self.args['device']))
 
     def train(self):
         # Initialize output metrics
@@ -111,7 +115,7 @@ class Trainer:
                     epoch_metrics = {}
 
                     # Train: Initialize training reconstruction distances
-                    if split == list(self.args['datasets'].keys())[0]:  # Training Set
+                    if split == self.splits[0]:  # Training Set
                         train_rec_dists = []
 
                     # Process each batch
@@ -134,14 +138,14 @@ class Trainer:
 
                         # Check NaN
                         if torch.isnan(out[0]).all():
-                            if split == list(self.args['datasets'].keys())[0]:
+                            if split == self.splits[0]:
                                 raise FloatingPointError('Found NaN values')
                             else:
                                 print('Warning: Found NaN values')
 
                         # Training
                         # Training Set
-                        if split == list(self.args['datasets'].keys())[0]:
+                        if split == self.splits[0]:
                             # Keep track of reconstruction distance
                             train_rec_dists.append(metrics['rec_dist'])
 
@@ -155,13 +159,9 @@ class Trainer:
                                 self.saver.dump_metric(
                                     v, args_trainer['step'], split, k, 'batch')
 
-                        # Dump model graph
-                        #if epoch == 1:
-                            #self.saver.dump_graph(self.net, x)
-
                     # End epoch, training: estimate thresholds from reconstruction distance
                     self.__end_epoch()
-                    if split == list(self.args['datasets'].keys())[0]:  # Training Set
+                    if split == self.splits[0]:  # Training Set
                         # Get stats
                         min_rec_dist = min(train_rec_dists)
                         max_rec_dist = max(train_rec_dists)
@@ -184,7 +184,7 @@ class Trainer:
 
                     # End epoch, val: compute TPR and FPR
                     # Validation Set
-                    elif split == list(self.args['datasets'].keys())[1]:
+                    elif split == self.splits[1]:
                         # Compute TPR and FPR
                         tpr_num = torch.cat(
                             [x.unsqueeze(0) for x in epoch_metrics['tp']], 0).sum(0).float()
@@ -227,7 +227,7 @@ class Trainer:
 
     def __forward_batch(self, x, label, args):
         # Set network mode
-        if args['split'] == list(self.args['datasets'].keys())[0]:  # Training Set
+        if args['split'] == self.splits[0]:  # Training Set
             self.net.train()
             torch.set_grad_enabled(True)
         else:
@@ -239,14 +239,14 @@ class Trainer:
         mse_loss = self.net.loss(x_rec, x, mu, logvar)
 
         # Optimize
-        if args['split'] == list(self.args['datasets'].keys())[0]:  # Training Set
+        if args['split'] == self.splits[0]:  # Training Set
             self.optim.zero_grad()
             mse_loss.backward()
             self.optim.step()
 
         # Log outputs and gradients
         # Training Set
-        if args['split'] == list(self.args['datasets'].keys())[0] and args['step'] % self.plot_every == 0:
+        if args['split'] == self.splits[0] and args['step'] % self.plot_every == 0:
             # Execute dump_histogram in different thread
             Thread(target=self.print_histogram, args=(
                 self.net.named_modules(), args['step'], self.net.named_parameters(), )).start()

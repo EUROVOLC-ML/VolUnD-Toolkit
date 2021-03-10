@@ -86,7 +86,7 @@ class Trainer:
         # Check if restore checkpoint
         if self.args['checkpoint'] is not None:
             # Restore checkpoint
-            self.net.load_state_dict(checkpoint['state_dict'])
+            self.net.load_state_dict(checkpoint['model_state_dict'])
 
         # Compute splits names
         self.splits = list(self.args['datasets'].keys())

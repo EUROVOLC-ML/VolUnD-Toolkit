@@ -1,6 +1,7 @@
 import torch
 from torch.utils.data import Dataset as TorchDataset
 import os
+os.environ['FOR_DISABLE_CONSOLE_CTRL_HANDLER'] = '1' # fix ctrl+c scipy bug
 from tqdm import tqdm
 from random import randint
 from scipy import signal

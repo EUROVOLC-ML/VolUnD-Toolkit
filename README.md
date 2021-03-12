@@ -8,8 +8,8 @@ The toolkit is developed in Python 3 using the PyTorch library, and is structure
 The root directory contains the following folders:
 - **cache** (internal use): storage directory for internally-processed dataset.
 - **dataset**: directory containing default locations for train/validation/test files. Each directory can contain an arbitrary number of files, each of which must be saved in PyTorch format (using torch.save) in dictionary format, containing the following keys
-  - CHANNELS_NAME: list of name for each channels,
-  - TIME_DESC: natural-language description of the temporal interval of represented in the file
+  - CHANNELS_NAME (optional): list of name for each channels,
+  - TIME_DESC (optional): natural-language description of the temporal interval of represented in the file
   - DATA: float tensor of size “stations × number of signals × chunk length
   - LABEL (optional): 0 for no activity or normal activity, 1 for e.g. mild volcanic activity, 2 for e.g. energetic eruptive activity ; if not provided, non-normal events will not be emphasized during visualization 
   - TIMESTAMP: list of Unix timestamps of size “number of signals”, corresponding to the signals in DATA

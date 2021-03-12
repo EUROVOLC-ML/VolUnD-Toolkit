@@ -48,10 +48,10 @@ def parse():
                                                         'chunk_only_one',
                                                         'chunk_rate',
                                                         'chunk_random_crop',
+                                                        'data_sampling_frequency',
                                                         'chunk_linear_subsample',
                                                         'chunk_butterworth_lowpass',
                                                         'chunk_butterworth_highpass',
-                                                        'chunk_butterworth_signal_frequency',
                                                         'chunk_butterworth_order',
                                                         'channels_list',
                                                         'batch_size',
@@ -98,10 +98,10 @@ chunk_len: 512\n\
 chunk_only_one: False\n\
 chunk_rate: 1\n\
 chunk_random_crop: False\n\
+data_sampling_frequency: None\n\
 chunk_linear_subsample: 1\n\
 chunk_butterworth_lowpass: None\n\
 chunk_butterworth_highpass: None\n\
-chunk_butterworth_signal_frequency: None\n\
 chunk_butterworth_order: 2\n\
 channels_list: None\n\
 batch_size: 128\n\
@@ -155,10 +155,35 @@ if __name__ == '__main__':
     normalize_params = {"mean": args['mean'], "std": args['std']}
 
     # Create dataset
-    train_dataset = Dataset(args['train_dir'], data_location=args['data_location'], chunk_len=args['chunk_len'], chunk_only_one=args['chunk_only_one'], chunk_rate=args['chunk_rate'], chunk_random_crop=args['chunk_random_crop'], chunk_linear_subsample=args['chunk_linear_subsample'], chunk_butterworth_lowpass=args['chunk_butterworth_lowpass'],
-                            chunk_butterworth_highpass=args['chunk_butterworth_highpass'], chunk_butterworth_signal_frequency=args['chunk_butterworth_signal_frequency'], chunk_butterworth_order=args['chunk_butterworth_order'], normalize_params=normalize_params, channels_list=args['channels_list'], provider=args['data_provider'], training_labels=args['training_labels'])
-    val_dataset = Dataset(args['val_dir'], data_location=args['data_location'], chunk_len=args['chunk_len'], chunk_only_one=args['chunk_only_one'], chunk_rate=args['chunk_rate'], chunk_random_crop=args['chunk_random_crop'], chunk_linear_subsample=args['chunk_linear_subsample'], chunk_butterworth_lowpass=args['chunk_butterworth_lowpass'],
-                          chunk_butterworth_highpass=args['chunk_butterworth_highpass'], chunk_butterworth_signal_frequency=args['chunk_butterworth_signal_frequency'], chunk_butterworth_order=args['chunk_butterworth_order'], normalize_params=normalize_params, channels_list=args['channels_list'], provider=args['data_provider'])
+    train_dataset = Dataset(args['train_dir'],
+                            data_location=args['data_location'],
+                            chunk_len=args['chunk_len'],
+                            chunk_only_one=args['chunk_only_one'],
+                            chunk_rate=args['chunk_rate'],
+                            chunk_random_crop=args['chunk_random_crop'],
+                            data_sampling_frequency=args['data_sampling_frequency'],
+                            chunk_linear_subsample=args['chunk_linear_subsample'],
+                            chunk_butterworth_lowpass=args['chunk_butterworth_lowpass'],
+                            chunk_butterworth_highpass=args['chunk_butterworth_highpass'],
+                            chunk_butterworth_order=args['chunk_butterworth_order'],
+                            normalize_params=normalize_params,
+                            channels_list=args['channels_list'],
+                            provider=args['data_provider'],
+                            training_labels=args['training_labels'])
+    val_dataset = Dataset(args['val_dir'],
+                          data_location=args['data_location'],
+                          chunk_len=args['chunk_len'],
+                          chunk_only_one=args['chunk_only_one'],
+                          chunk_rate=args['chunk_rate'],
+                          chunk_random_crop=args['chunk_random_crop'],
+                          data_sampling_frequency=args['data_sampling_frequency'],
+                          chunk_linear_subsample=args['chunk_linear_subsample'],
+                          chunk_butterworth_lowpass=args['chunk_butterworth_lowpass'],
+                          chunk_butterworth_highpass=args['chunk_butterworth_highpass'],
+                          chunk_butterworth_order=args['chunk_butterworth_order'],
+                          normalize_params=normalize_params,
+                          channels_list=args['channels_list'],
+                          provider=args['data_provider'])
 
     # Save number of channels
     example, _, _ = train_dataset[0]

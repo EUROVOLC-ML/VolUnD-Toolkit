@@ -30,10 +30,10 @@ The main files in the toolkit are:
   - chunk_only_one: take one or all chunk of single signal; default False
   - chunk_rate: if chunk_only_one=False, take one chunk every chunk_rate; default 1
   - chunk_random_crop: if chunk_only_one=True, take one chunk randomly in single signal; default False
+  - data_sampling_frequency: set frequency (Hz) of input signals
   - chunk_linear_subsample: apply linear subsample to sigle signal, MUST BE A POWER OF 2 (1,2,4,8,16,32,64,128...); default 1 (not apply linear subsample)
   - chunk_butterworth_lowpass: apply butterworth low pass filter at this frequency (Hz); default None (not apply low pass filter)
   - chunk_butterworth_highpass: apply butterworth high pass filter at this frequency (Hz); default None (not apply high pass filter)
-  - chunk_butterworth_signal_frequency: set frequency (Hz) of input signals
   - chunk_butterworth_order: set order of butterworth filter; default 2
   - channels_list: if present, list of channels (i.e., input stations) to use; default “None”
   - batch_size: mini-batch size for gradient descent; default 128
@@ -74,10 +74,10 @@ The main files in the toolkit are:
   - chunk_only_one: as above
   - chunk_rate: as above
   - chunk_random_crop: as above
+  - data_sampling_frequency: as above
   - chunk_linear_subsample: as above
   - chunk_butterworth_lowpass: as above
   - chunk_butterworth_highpass: as above
-  - chunk_butterworth_signal_frequency: as above
   - chunk_butterworth_order: as above
   - channels_list: as above
   - batch_size: as above

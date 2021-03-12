@@ -64,10 +64,10 @@ def parse():
                                                         'chunk_only_one',
                                                         'chunk_rate',
                                                         'chunk_random_crop',
+                                                        'data_sampling_frequency',
                                                         'chunk_linear_subsample',
                                                         'chunk_butterworth_lowpass',
                                                         'chunk_butterworth_highpass',
-                                                        'chunk_butterworth_signal_frequency',
                                                         'chunk_butterworth_order',
                                                         'channels_list',
                                                         'batch_size',
@@ -97,10 +97,10 @@ chunk_len: 512\n\
 chunk_only_one: False\n\
 chunk_rate: 1\n\
 chunk_random_crop: False\n\
+data_sampling_frequency: None\n\
 chunk_linear_subsample: 1\n\
 chunk_butterworth_lowpass: None\n\
 chunk_butterworth_highpass: None\n\
-chunk_butterworth_signal_frequency: None\n\
 chunk_butterworth_order: 2\n\
 channels_list: None\n\
 batch_size: 128\n\
@@ -131,10 +131,8 @@ def plotSetup(ax, x, y, channel_name, outDATETIME, label_activity, label_eruptio
     ax.set_xticklabels(outDATETIME, rotation=45)
     ax.xaxis.set_major_locator(plt.MaxNLocator(10))
     ax.set(xlabel='Timestamp (yyyy-mm-dd-hh-mm-ss)')
-    ax.fill_between(x, np.array(label_activity, dtype=int) *
-                    (max_value/2), color='yellow', label='Activity')
-    ax.fill_between(x, np.array(label_eruption, dtype=int) *
-                    max_value, color='red', label='Eruption')
+    ax.fill_between(x, np.array(label_activity, dtype=int) * (max_value/2), color='yellow', label='Activity')
+    ax.fill_between(x, np.array(label_eruption, dtype=int) * max_value, color='red', label='Eruption')
     print("    In progress 1/2...")
     if not y_log:
         ax.set(ylabel='Reconstruction distance')
@@ -150,8 +148,7 @@ def plotSetup(ax, x, y, channel_name, outDATETIME, label_activity, label_eruptio
         if epoch == None:
             title = "Graph (LOG y-scale) CH_" + str(channel_name)
         else:
-            title = "Graph (LOG y-scale) CH_" + \
-                str(channel_name) + f" (epoch {epoch})"
+            title = "Graph (LOG y-scale) CH_" + str(channel_name) + f" (epoch {epoch})"
     ax.title.set_text(title)
     print("    In progress 2/2...")
 
@@ -162,12 +159,10 @@ def plotAndSaveGraphs(dist_ch, channel_name, outDATETIME, label_activity, label_
     _, ax = plt.subplots(ncols=2, nrows=1, tight_layout=True)
     # Normal y-scale
     print("Elaborating 1/2...")
-    plotSetup(ax[0], x, y, channel_name, outDATETIME,
-              label_activity, label_eruption, epoch, y_log=False)
+    plotSetup(ax[0], x, y, channel_name, outDATETIME, label_activity, label_eruption, epoch, y_log=False)
     # Log y-scale
     print("Elaborating 2/2...")
-    plotSetup(ax[1], x, y, channel_name, outDATETIME,
-              label_activity, label_eruption, epoch, y_log=True)
+    plotSetup(ax[1], x, y, channel_name, outDATETIME, label_activity, label_eruption, epoch, y_log=True)
     # Show graphs
     print("Saving...")
     plt.legend(loc='upper left', bbox_to_anchor=(1, 1))
@@ -202,8 +197,20 @@ if __name__ == '__main__':
     normalize_params = {"mean": args['mean'], "std": args['std']}
 
     # Instantiate dataset
-    test_dataset = Dataset(args['test_dir'], data_location=args['data_location'], chunk_len=args['chunk_len'], chunk_only_one=args['chunk_only_one'], chunk_rate=args['chunk_rate'], chunk_random_crop=args['chunk_random_crop'], chunk_linear_subsample=args['chunk_linear_subsample'], chunk_butterworth_lowpass=args['chunk_butterworth_lowpass'],
-                           chunk_butterworth_highpass=args['chunk_butterworth_highpass'], chunk_butterworth_signal_frequency=args['chunk_butterworth_signal_frequency'], chunk_butterworth_order=args['chunk_butterworth_order'], normalize_params=normalize_params, channels_list=args['channels_list'], provider=args['data_provider'])
+    test_dataset = Dataset(args['test_dir'],
+                           data_location=args['data_location'],
+                           chunk_len=args['chunk_len'],
+                           chunk_only_one=args['chunk_only_one'],
+                           chunk_rate=args['chunk_rate'],
+                           chunk_random_crop=args['chunk_random_crop'],
+                           data_sampling_frequency=args['data_sampling_frequency'],
+                           chunk_linear_subsample=args['chunk_linear_subsample'],
+                           chunk_butterworth_lowpass=args['chunk_butterworth_lowpass'],
+                           chunk_butterworth_highpass=args['chunk_butterworth_highpass'],
+                           chunk_butterworth_order=args['chunk_butterworth_order'],
+                           normalize_params=normalize_params,
+                           channels_list=args['channels_list'],
+                           provider=args['data_provider'])
 
     # Instantiate loader
     test_loader = data.DataLoader(
@@ -233,7 +240,7 @@ if __name__ == '__main__':
                   max_channels=hyperparams['max_channels'],
                   h_size=hyperparams['h_size'],
                   enable_variational=hyperparams['enable_variational'])
-    model.load_state_dict(checkpoint_dict['state_dict'])
+    model.load_state_dict(checkpoint_dict['model_state_dict'])
     model.eval()
     model.to(args['device'])
 
@@ -249,9 +256,13 @@ if __name__ == '__main__':
     outLABEL = []
     outTIMESTAMP = []
     for i, sig_batch in enumerate(tqdm(out, desc='Elaborating')):
-        for j in range(sig_batch.shape[0]):
-            outLIN.append(
-                test_dataset[i*args['batch_size']+j][0] - sig_batch[j])
+        for j in range(sig_batch.shape[0]): # batch
+            tmp_sig = torch.zeros(sig_batch.shape[1:])
+            for k in range(sig_batch.shape[1]): # channel
+                # Ignore reconstruction distance if signal is all 0 (station off)
+                if test_dataset[i*args['batch_size']+j][0][k].sum(0) != 0:
+                    tmp_sig[k] = test_dataset[i*args['batch_size']+j][0][k] - sig_batch[j,k]
+            outLIN.append(tmp_sig)
             outLABEL.append(test_dataset[i*args['batch_size']+j][1])
             outTIMESTAMP.append(test_dataset[i*args['batch_size']+j][2])
     outUNIONdiff = torch.stack(outLIN)

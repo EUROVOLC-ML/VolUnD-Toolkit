@@ -28,7 +28,7 @@ class FSProvider(TorchDataset):
     Data provider from file system
     """
 
-    def __init__(self, data_dir, data_location, chunk_len, chunk_only_one=False, chunk_rate=1, chunk_random_crop=False, chunk_linear_subsample=1, chunk_butterworth_lowpass=None, chunk_butterworth_highpass=None, chunk_butterworth_signal_frequency=None, chunk_butterworth_order=2, channels_list=None, cache_dir='./cache', training_labels=None):
+    def __init__(self, data_dir, data_location, chunk_len, chunk_only_one=False, chunk_rate=1, chunk_random_crop=False, data_sampling_frequency=None, chunk_linear_subsample=1, chunk_butterworth_lowpass=None, chunk_butterworth_highpass=None, chunk_butterworth_order=2, channels_list=None, cache_dir='./cache', training_labels=None):
         """
         Args:
         - data_dir (string): path to directory containing files.
@@ -37,10 +37,10 @@ class FSProvider(TorchDataset):
         - chunk_only_one (boolean): take one or all chunk of single signal
         - chunk_rate (int): if chunk_only_one=False, take one chunk every chunk_rate
         - chunk_random_crop (boolean): if chunk_only_one=True, take one chunk randomly in single signal
+        - data_sampling_frequency (int): set frequency (Hz) of input signals 
         - chunk_linear_subsample (int): apply linear subsample to sigle signal, MUST BE A POWER OF 2 (1,2,4,8,16,32,64,128...)
         - chunk_butterworth_lowpass (int): if not None, apply butterworth low pass filter at chunk_butterworth_lowpass Hz
         - chunk_butterworth_highpass (int): if not None, apply butterworth high pass filter at chunk_butterworth_highpass Hz
-        - chunk_butterworth_signal_frequency (int): set frequency (Hz) of input signals 
         - chunk_butterworth_order (int): set order of butterworth filter
         - channels_list (list of int): if not None, select channel (with given index) from data
         - cache_dir (string): path to directory where dataset information are cached
@@ -54,18 +54,21 @@ class FSProvider(TorchDataset):
         self.chunk_only_one = chunk_only_one
         self.chunk_rate = chunk_rate
         self.chunk_random_crop = chunk_random_crop
+        self.data_sampling_frequency = data_sampling_frequency
         self.chunk_linear_subsample = chunk_linear_subsample
         self.cache_dir = os.path.abspath(cache_dir)
         self.channels_list = channels_list
         self.training_labels = training_labels
 
+        # Check data_sampling_frequency
+        if (self.data_sampling_frequency is None) or (self.data_sampling_frequency <= 0):
+            raise AttributeError("data_sampling_frequency must be greater than 0!")
+
         # Check linear subsample setup value
         if (self.chunk_linear_subsample & (self.chunk_linear_subsample-1)) != 0:
-            raise AttributeError(
-                "chunk_linear_subsample must be a power of 2!")
+            raise AttributeError("chunk_linear_subsample must be a power of 2!")
         if self.chunk_linear_subsample >= self.chunk_len:
-            raise AttributeError(
-                "chunk_linear_subsample must be lower than chunk_len!")
+            raise AttributeError("chunk_linear_subsample must be lower than chunk_len!")
 
         # Buffer for current file
         self.curr_file_idx = None
@@ -101,13 +104,13 @@ class FSProvider(TorchDataset):
         # Calculate Butterworth filter setup
         if (chunk_butterworth_highpass is not None) and (chunk_butterworth_lowpass is not None):
             self.butterworth_sos = signal.butter(chunk_butterworth_order, [chunk_butterworth_highpass/(
-                0.5*chunk_butterworth_signal_frequency), chunk_butterworth_lowpass/(0.5*chunk_butterworth_signal_frequency)], analog=False, btype='bandpass', output='sos')
+                0.5*self.data_sampling_frequency), chunk_butterworth_lowpass/(0.5*self.data_sampling_frequency)], analog=False, btype='bandpass', output='sos')
         elif chunk_butterworth_highpass is not None:
             self.butterworth_sos = signal.butter(chunk_butterworth_order, chunk_butterworth_highpass/(
-                0.5*chunk_butterworth_signal_frequency), analog=False, btype='highpass', output='sos')
+                0.5*self.data_sampling_frequency), analog=False, btype='highpass', output='sos')
         elif chunk_butterworth_lowpass is not None:
             self.butterworth_sos = signal.butter(chunk_butterworth_order, chunk_butterworth_lowpass/(
-                0.5*chunk_butterworth_signal_frequency), analog=False, btype='lowpass', output='sos')
+                0.5*self.data_sampling_frequency), analog=False, btype='lowpass', output='sos')
         else:
             self.butterworth_sos = None
 
@@ -236,7 +239,7 @@ class FSProvider(TorchDataset):
         # Get chunk
         chunk = data[:, chunk_start, point_list]
         label_chunk = label[chunk_start]
-        time_chunk = timestamp[chunk_start]
+        time_chunk = timestamp[chunk_start] + int(m1/self.data_sampling_frequency)
 
         # Free whole data storage
         chunk = chunk.clone()
@@ -258,7 +261,7 @@ class RAMProvider(TorchDataset):
     Data provider from RAM
     """
 
-    def __init__(self, data_dir, data_location, chunk_len, chunk_only_one=False, chunk_rate=1, chunk_random_crop=False, chunk_linear_subsample=1, chunk_butterworth_lowpass=None, chunk_butterworth_highpass=None, chunk_butterworth_signal_frequency=None, chunk_butterworth_order=2, channels_list=None, cache_dir='./cache', training_labels=None):
+    def __init__(self, data_dir, data_location, chunk_len, chunk_only_one=False, chunk_rate=1, chunk_random_crop=False, data_sampling_frequency=None, chunk_linear_subsample=1, chunk_butterworth_lowpass=None, chunk_butterworth_highpass=None, chunk_butterworth_order=2, channels_list=None, cache_dir='./cache', training_labels=None):
         """
         Args:
         - data_dir (string): path to directory containing files.
@@ -267,10 +270,10 @@ class RAMProvider(TorchDataset):
         - chunk_only_one (boolean): take one or all chunk of single signal
         - chunk_rate (int): if chunk_only_one=False, take one chunk every chunk_rate
         - chunk_random_crop (boolean): if chunk_only_one=True, take one chunk randomly in single signal
+        - data_sampling_frequency (int): set frequency (Hz) of input signals 
         - chunk_linear_subsample (int): apply linear subsample to sigle signal, MUST BE POWER OF 2 (1,2,4,8,16,32,64,128...)
         - chunk_butterworth_lowpass (int): if not None, apply butterworth low pass filter at chunk_butterworth_lowpass Hz
         - chunk_butterworth_highpass (int): if not None, apply butterworth high pass filter at chunk_butterworth_highpass Hz
-        - chunk_butterworth_signal_frequency (int): set frequency (Hz) of input signals 
         - chunk_butterworth_order (int): set order of butterworth filter
         - channels_list (list of int): if not None, select channel (with given index) from data
         - cache_dir (string): path to directory where dataset information are cached
@@ -303,8 +306,7 @@ class RAMProvider(TorchDataset):
                 data_dir, f)) and is_not_hidden(os.path.join(data_dir, f)) and os.path.basename(f)[0] != '.']
 
         # Get dataset name for cache
-        cache_name = os.path.basename(data_dir).replace(
-            '/', '_').replace('\\', '_').replace('.', '_')
+        cache_name = os.path.basename(data_dir).replace('/', '_').replace('\\', '_').replace('.', '_')
         cache_name += f'_ram_{chunk_len}_{chunk_only_one}_{chunk_rate}_{chunk_random_crop}_{chunk_linear_subsample}'
         cache_name += f'_label_{"all" if  training_labels is None else "".join(str(l) for l in training_labels).replace(" ", "_")}'
         cache_name += f'_ch_{"all" if  channels_list is None else "".join(str(c) for c in channels_list).replace(" ", "_")}'
@@ -319,10 +321,10 @@ class RAMProvider(TorchDataset):
                      'chunk_only_one': chunk_only_one,
                      'chunk_rate': chunk_rate,
                      'chunk_random_crop': chunk_random_crop,
+                     'data_sampling_frequency': data_sampling_frequency,
                      'chunk_linear_subsample': chunk_linear_subsample,
                      'chunk_butterworth_lowpass': chunk_butterworth_lowpass,
                      'chunk_butterworth_highpass': chunk_butterworth_highpass,
-                     'chunk_butterworth_signal_frequency': chunk_butterworth_signal_frequency,
                      'chunk_butterworth_order': chunk_butterworth_order}
         # Check cache
         reload_cache = True
@@ -345,8 +347,20 @@ class RAMProvider(TorchDataset):
             # Initialize data
             self.data = []
             # Create FS provider
-            fs_provider = FSProvider(data_dir, data_location=data_location, chunk_len=chunk_len, chunk_only_one=chunk_only_one, chunk_rate=chunk_rate, chunk_random_crop=chunk_random_crop, chunk_linear_subsample=chunk_linear_subsample, chunk_butterworth_lowpass=chunk_butterworth_lowpass,
-                                     chunk_butterworth_highpass=chunk_butterworth_highpass, chunk_butterworth_signal_frequency=chunk_butterworth_signal_frequency, chunk_butterworth_order=chunk_butterworth_order, channels_list=channels_list, cache_dir=cache_dir, training_labels=training_labels)
+            fs_provider = FSProvider(data_dir,
+                                     data_location=data_location,
+                                     chunk_len=chunk_len,
+                                     chunk_only_one=chunk_only_one,
+                                     chunk_rate=chunk_rate,
+                                     chunk_random_crop=chunk_random_crop,
+                                     data_sampling_frequency=data_sampling_frequency,
+                                     chunk_linear_subsample=chunk_linear_subsample,
+                                     chunk_butterworth_lowpass=chunk_butterworth_lowpass,
+                                     chunk_butterworth_highpass=chunk_butterworth_highpass,
+                                     chunk_butterworth_order=chunk_butterworth_order,
+                                     channels_list=channels_list,
+                                     cache_dir=cache_dir,
+                                     training_labels=training_labels)
             # Read all files
             for i in tqdm(range(len(fs_provider))):
                 # Get data
@@ -373,7 +387,7 @@ class RAMProvider(TorchDataset):
 
 class Dataset(TorchDataset):
 
-    def __init__(self, data_dir, data_location, chunk_len, chunk_only_one=False, chunk_rate=1, chunk_random_crop=False, chunk_linear_subsample=1, chunk_butterworth_lowpass=None, chunk_butterworth_highpass=None, chunk_butterworth_signal_frequency=None, chunk_butterworth_order=2, normalize_params=None, channels_list=None, cache_dir='./cache', training_labels=None, provider='ram'):
+    def __init__(self, data_dir, data_location, chunk_len, chunk_only_one=False, chunk_rate=1, chunk_random_crop=False, data_sampling_frequency=None, chunk_linear_subsample=1, chunk_butterworth_lowpass=None, chunk_butterworth_highpass=None, chunk_butterworth_order=2, normalize_params=None, channels_list=None, cache_dir='./cache', training_labels=None, provider='ram'):
         """
         Args:
         - data_dir (string): path to directory containing files.
@@ -383,10 +397,10 @@ class Dataset(TorchDataset):
         - chunk_only_one (boolean): take one or all chunk of single signal
         - chunk_rate (int): if chunk_only_one=False, take one chunk every chunk_rate
         - chunk_random_crop (boolean): if chunk_only_one=True, take one chunk randomly in single signal
+        - data_sampling_frequency (int): set frequency (Hz) of input signals 
         - chunk_linear_subsample (int): apply linear subsample to sigle signal, MUST BE POWER OF 2 (1,2,4,8,16,32,64,128...)
         - chunk_butterworth_lowpass (int): if not None, apply butterworth low pass filter at chunk_butterworth_lowpass Hz
         - chunk_butterworth_highpass (int): if not None, apply butterworth high pass filter at chunk_butterworth_highpass Hz
-        - chunk_butterworth_signal_frequency (int): set frequency (Hz) of input signals 
         - chunk_butterworth_order (int): set order of butterworth filter
         - channels_list (list of int): if not None, select channel (with given index) from data
         - cache_dir (string): path to directory where dataset information are cached
@@ -396,14 +410,38 @@ class Dataset(TorchDataset):
 
         # Initialize provider
         self.provider = provider
-        assert self.provider in [
-            'ram', 'fs'], "Dataset provider must be either 'ram' or 'fs'!"
+        if self.provider not in ['ram', 'fs']:
+            raise AttributeError("Dataset provider must be either 'ram' or 'fs'!")
         if self.provider == 'ram':
-            self.provider = RAMProvider(data_dir, data_location=data_location, chunk_len=chunk_len, chunk_only_one=chunk_only_one, chunk_rate=chunk_rate, chunk_random_crop=chunk_random_crop, chunk_linear_subsample=chunk_linear_subsample, chunk_butterworth_lowpass=chunk_butterworth_lowpass,
-                                        chunk_butterworth_highpass=chunk_butterworth_highpass, chunk_butterworth_signal_frequency=chunk_butterworth_signal_frequency, chunk_butterworth_order=chunk_butterworth_order, channels_list=channels_list, cache_dir=cache_dir, training_labels=training_labels)
+            self.provider = RAMProvider(data_dir,
+                                        data_location=data_location,
+                                        chunk_len=chunk_len,
+                                        chunk_only_one=chunk_only_one,
+                                        chunk_rate=chunk_rate,
+                                        chunk_random_crop=chunk_random_crop,
+                                        data_sampling_frequency=data_sampling_frequency,
+                                        chunk_linear_subsample=chunk_linear_subsample,
+                                        chunk_butterworth_lowpass=chunk_butterworth_lowpass,
+                                        chunk_butterworth_highpass=chunk_butterworth_highpass,
+                                        chunk_butterworth_order=chunk_butterworth_order,
+                                        channels_list=channels_list,
+                                        cache_dir=cache_dir,
+                                        training_labels=training_labels)
         elif self.provider == 'fs':
-            self.provider = FSProvider(data_dir, data_location=data_location, chunk_len=chunk_len, chunk_only_one=chunk_only_one, chunk_rate=chunk_rate, chunk_random_crop=chunk_random_crop, chunk_linear_subsample=chunk_linear_subsample, chunk_butterworth_lowpass=chunk_butterworth_lowpass,
-                                       chunk_butterworth_highpass=chunk_butterworth_highpass, chunk_butterworth_signal_frequency=chunk_butterworth_signal_frequency, chunk_butterworth_order=chunk_butterworth_order, channels_list=channels_list, cache_dir=cache_dir, training_labels=training_labels)
+            self.provider = FSProvider(data_dir,
+                                       data_location=data_location,
+                                       chunk_len=chunk_len,
+                                       chunk_only_one=chunk_only_one,
+                                       chunk_rate=chunk_rate,
+                                       chunk_random_crop=chunk_random_crop,
+                                       data_sampling_frequency=data_sampling_frequency,
+                                       hunk_linear_subsample=chunk_linear_subsample,
+                                       chunk_butterworth_lowpass=chunk_butterworth_lowpass,
+                                       chunk_butterworth_highpass=chunk_butterworth_highpass,
+                                       chunk_butterworth_order=chunk_butterworth_order,
+                                       channels_list=channels_list,
+                                       cache_dir=cache_dir,
+                                       training_labels=training_labels)
 
         # Store normalization params
         self.normalize_params = normalize_params

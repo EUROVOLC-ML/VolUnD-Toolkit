@@ -248,8 +248,7 @@ class Trainer:
         # Training Set
         if args['split'] == self.splits[0] and args['step'] % self.plot_every == 0:
             # Execute dump_histogram in different thread
-            Thread(target=self.print_histogram, args=(
-                self.net.named_modules(), args['step'], self.net.named_parameters(), )).start()
+            Thread(target=self.print_histogram, args=(self.net.named_modules(), args['step'], self.net.named_parameters(), )).start()
 
         # Compute MAE
         mae = (x - x_rec).abs().mean()
@@ -282,8 +281,7 @@ class Trainer:
         # Plot
         if args['step'] % self.plot_every == 0:
             # Execute dump_line in different thread
-            Thread(target=self.print_line, args=(
-                self.ch_list, self.args['datasets'], args['step'], args['split'], x, x_rec, )).start()
+            Thread(target=self.print_line, args=(self.ch_list, self.args['datasets'], args['step'], args['split'], x, x_rec, )).start()
 
         # Return metrics
         return (x_rec, mu, logvar), metrics
@@ -309,10 +307,7 @@ class Trainer:
         # Log output signal reconstruction
         for index in range(len(self.ch_list)):
             # Get channel name
-            channel_name = args_datasets[list(args_datasets.keys())[
-                0]].get_channels_name()[index]
+            channel_name = args_datasets[list(args_datasets.keys())[0]].get_channels_name()[index]
             # Log signal
-            self.saver.dump_line(x[0, index, :], args_step,
-                                 args_split, 'CH_'+str(channel_name))
-            self.saver.dump_line(
-                x_rec[0, index, :], args_step, args_split, 'CH_'+str(channel_name)+'_reconstruction')
+            self.saver.dump_line(x[0, index, :], args_step, args_split, 'CH_'+str(channel_name))
+            self.saver.dump_line(x_rec[0, index, :], args_step, args_split, 'CH_'+str(channel_name)+'_reconstruction')

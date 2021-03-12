@@ -12,10 +12,10 @@ chunk_len: 512
 chunk_only_one: False
 chunk_rate: 1
 chunk_random_crop: False
+data_sampling_frequency: None
 chunk_linear_subsample: 1
 chunk_butterworth_lowpass: None
 chunk_butterworth_highpass: None
-chunk_butterworth_signal_frequency: None
 chunk_butterworth_order: 2
 channels_list: None
 batch_size: 128

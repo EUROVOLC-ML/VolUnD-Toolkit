@@ -54,6 +54,7 @@ def parse():
                                                         'chunk_butterworth_highpass',
                                                         'chunk_butterworth_order',
                                                         'channels_list',
+                                                        'channels_name',
                                                         'batch_size',
                                                         'data_provider',
                                                         'mean',
@@ -104,6 +105,7 @@ chunk_butterworth_lowpass: None\n\
 chunk_butterworth_highpass: None\n\
 chunk_butterworth_order: 2\n\
 channels_list: None\n\
+channels_name: None\n\
 batch_size: 128\n\
 data_provider: 'ram'\n\
 mean: None\n\
@@ -168,6 +170,7 @@ if __name__ == '__main__':
                             chunk_butterworth_order=args['chunk_butterworth_order'],
                             normalize_params=normalize_params,
                             channels_list=args['channels_list'],
+                            channels_name=args['channels_name'],
                             provider=args['data_provider'],
                             training_labels=args['training_labels'])
     val_dataset = Dataset(args['val_dir'],
@@ -183,6 +186,7 @@ if __name__ == '__main__':
                           chunk_butterworth_order=args['chunk_butterworth_order'],
                           normalize_params=normalize_params,
                           channels_list=args['channels_list'],
+                          channels_name=args['channels_name'],
                           provider=args['data_provider'])
 
     # Save number of channels

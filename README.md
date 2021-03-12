@@ -38,6 +38,7 @@ The main files in the toolkit are:
   - chunk_butterworth_highpass: apply butterworth high pass filter at this frequency (Hz); default None (not apply high pass filter)
   - chunk_butterworth_order: set order of butterworth filter; default 2
   - channels_list: if present, list of channels (i.e., input stations) to use; default “None”
+  - channels_name: if present, list of channels name (i.e., name of input stations); default “None”
   - batch_size: mini-batch size for gradient descent; default 128
   - data_provider: specifies whether data should be stored on RAM (faster; value “ram”) or should be read from the filesystem (slower; value “fs”); default “ram”
   - mean: if not None, list of per-channel means for standardization; default None
@@ -82,6 +83,7 @@ The main files in the toolkit are:
   - chunk_butterworth_highpass: as above
   - chunk_butterworth_order: as above
   - channels_list: as above
+  - channels_name: as above
   - batch_size: as above
   - data_provider: as above
   - mean: as above

@@ -28,7 +28,7 @@ class FSProvider(TorchDataset):
     Data provider from file system
     """
 
-    def __init__(self, data_dir, data_location, chunk_len, chunk_only_one=False, chunk_rate=1, chunk_random_crop=False, data_sampling_frequency=None, chunk_linear_subsample=1, chunk_butterworth_lowpass=None, chunk_butterworth_highpass=None, chunk_butterworth_order=2, channels_list=None, cache_dir='./cache', training_labels=None):
+    def __init__(self, data_dir, data_location, chunk_len, chunk_only_one=False, chunk_rate=1, chunk_random_crop=False, data_sampling_frequency=None, chunk_linear_subsample=1, chunk_butterworth_lowpass=None, chunk_butterworth_highpass=None, chunk_butterworth_order=2, channels_list=None, channels_name=None, cache_dir='./cache', training_labels=None):
         """
         Args:
         - data_dir (string): path to directory containing files.
@@ -43,6 +43,7 @@ class FSProvider(TorchDataset):
         - chunk_butterworth_highpass (int): if not None, apply butterworth high pass filter at chunk_butterworth_highpass Hz
         - chunk_butterworth_order (int): set order of butterworth filter
         - channels_list (list of int): if not None, select channel (with given index) from data
+        - channels_name (list of string): if not None, set name of channels (stations)
         - cache_dir (string): path to directory where dataset information are cached
         - training_labels (list of int): if not None, use only data (with given integer) of normal activity
         """
@@ -58,6 +59,7 @@ class FSProvider(TorchDataset):
         self.chunk_linear_subsample = chunk_linear_subsample
         self.cache_dir = os.path.abspath(cache_dir)
         self.channels_list = channels_list
+        self.channels_name = channels_name
         self.training_labels = training_labels
 
         # Check data_sampling_frequency
@@ -116,8 +118,10 @@ class FSProvider(TorchDataset):
             self.butterworth_sos = None
 
         # Get channels name
-        self.channels_name = read_file_info(os.path.join(
-            self.data_dir, self.files[0]), self.channels_list)
+        if self.channels_name is None:
+            self.channels_name = read_file_info(os.path.join(self.data_dir, self.files[0]), self.channels_list)
+        elif len(self.channels_name) is not len(read_file_info(os.path.join(self.data_dir, self.files[0]), self.channels_list)):
+            raise AttributeError("channels_name must have same lenght of signal channels!")
 
         # Get dataset name for cache
         cache_name = os.path.basename(self.data_dir).replace(
@@ -262,7 +266,7 @@ class RAMProvider(TorchDataset):
     Data provider from RAM
     """
 
-    def __init__(self, data_dir, data_location, chunk_len, chunk_only_one=False, chunk_rate=1, chunk_random_crop=False, data_sampling_frequency=None, chunk_linear_subsample=1, chunk_butterworth_lowpass=None, chunk_butterworth_highpass=None, chunk_butterworth_order=2, channels_list=None, cache_dir='./cache', training_labels=None):
+    def __init__(self, data_dir, data_location, chunk_len, chunk_only_one=False, chunk_rate=1, chunk_random_crop=False, data_sampling_frequency=None, chunk_linear_subsample=1, chunk_butterworth_lowpass=None, chunk_butterworth_highpass=None, chunk_butterworth_order=2, channels_list=None, channels_name=None, cache_dir='./cache', training_labels=None):
         """
         Args:
         - data_dir (string): path to directory containing files.
@@ -277,6 +281,7 @@ class RAMProvider(TorchDataset):
         - chunk_butterworth_highpass (int): if not None, apply butterworth high pass filter at chunk_butterworth_highpass Hz
         - chunk_butterworth_order (int): set order of butterworth filter
         - channels_list (list of int): if not None, select channel (with given index) from data
+        - channels_name (list of string): if not None, set name of channels (stations)
         - cache_dir (string): path to directory where dataset information are cached
         - training_labels (list of int): if not None, use only data (with given integer) of normal activity
         """
@@ -319,6 +324,7 @@ class RAMProvider(TorchDataset):
                      'data_dir': os.path.basename(data_dir),
                      'training_labels': training_labels,
                      'channels_list': channels_list,
+                     'channels_name_setup': channels_name,
                      'chunk_len': chunk_len,
                      'chunk_only_one': chunk_only_one,
                      'chunk_rate': chunk_rate,
@@ -361,6 +367,7 @@ class RAMProvider(TorchDataset):
                                      chunk_butterworth_highpass=chunk_butterworth_highpass,
                                      chunk_butterworth_order=chunk_butterworth_order,
                                      channels_list=channels_list,
+                                     channels_name=channels_name,
                                      cache_dir=cache_dir,
                                      training_labels=training_labels)
             # Read all files
@@ -389,7 +396,7 @@ class RAMProvider(TorchDataset):
 
 class Dataset(TorchDataset):
 
-    def __init__(self, data_dir, data_location, chunk_len, chunk_only_one=False, chunk_rate=1, chunk_random_crop=False, data_sampling_frequency=None, chunk_linear_subsample=1, chunk_butterworth_lowpass=None, chunk_butterworth_highpass=None, chunk_butterworth_order=2, normalize_params=None, channels_list=None, cache_dir='./cache', training_labels=None, provider='ram'):
+    def __init__(self, data_dir, data_location, chunk_len, chunk_only_one=False, chunk_rate=1, chunk_random_crop=False, data_sampling_frequency=None, chunk_linear_subsample=1, chunk_butterworth_lowpass=None, chunk_butterworth_highpass=None, chunk_butterworth_order=2, normalize_params=None, channels_list=None, channels_name=None, cache_dir='./cache', training_labels=None, provider='ram'):
         """
         Args:
         - data_dir (string): path to directory containing files.
@@ -405,6 +412,7 @@ class Dataset(TorchDataset):
         - chunk_butterworth_highpass (int): if not None, apply butterworth high pass filter at chunk_butterworth_highpass Hz
         - chunk_butterworth_order (int): set order of butterworth filter
         - channels_list (list of int): if not None, select channel (with given index) from data
+        - channels_name (list of string): if not None, set name of channels (stations)
         - cache_dir (string): path to directory where dataset information are cached
         - training_labels (list of int): if not None, use only data (with given integer) of normal activity
         - provider ('ram'|'fs'): pre-load data on RAM or load from file system
@@ -427,6 +435,7 @@ class Dataset(TorchDataset):
                                         chunk_butterworth_highpass=chunk_butterworth_highpass,
                                         chunk_butterworth_order=chunk_butterworth_order,
                                         channels_list=channels_list,
+                                        channels_name=channels_name,
                                         cache_dir=cache_dir,
                                         training_labels=training_labels)
         elif self.provider == 'fs':
@@ -442,6 +451,7 @@ class Dataset(TorchDataset):
                                        chunk_butterworth_highpass=chunk_butterworth_highpass,
                                        chunk_butterworth_order=chunk_butterworth_order,
                                        channels_list=channels_list,
+                                       channels_name=channels_name,
                                        cache_dir=cache_dir,
                                        training_labels=training_labels)
 

@@ -18,6 +18,7 @@ chunk_butterworth_lowpass: None
 chunk_butterworth_highpass: None
 chunk_butterworth_order: 2
 channels_list: None
+channels_name: None
 batch_size: 128
 data_provider: 'ram'
 mean: None

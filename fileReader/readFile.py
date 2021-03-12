@@ -14,7 +14,7 @@ def read_file(file_path):
     # Check if label data exist on file read and extract it or set to 0 (normal activity)
     try:
         label = data_load['LABEL']
-    except(KeyError):
+    except KeyError:
         print("Label not found: assume all events of class 0 (normal)!")
         label = torch.zeros(len(timestamp)).tolist()
 
@@ -28,7 +28,7 @@ def read_file_info(file_path, channels_list):
     # Check if channels name exist on file read and extract it or set to value of channels_list
     try:
         channels_name = data_load['CHANNELS_NAME']
-    except(KeyError):
+    except KeyError:
         print("Channel Name not found.")
         if channels_list is not None:
             channels_name = [str(channels_list[i])

@@ -169,7 +169,7 @@ class Trainer:
                         # Compute threshold range
                         dist_thresholds = torch.linspace(
                             0, 2*max_rec_dist, 64).unsqueeze(0).to(self.args['device'])
-                        #dist_thresholds = torch.linspace(min_rec_dist, max_rec_dist + 2*(max_rec_dist - min_rec_dist), 20).unsqueeze(0).to(self.args['device'])
+                        # dist_thresholds = torch.linspace(min_rec_dist, max_rec_dist + 2*(max_rec_dist - min_rec_dist), 20).unsqueeze(0).to(self.args['device'])
 
                         # Log epoch metrics
                         for k, v in epoch_metrics.items():

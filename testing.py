@@ -137,7 +137,7 @@ def plotSetup(ax, x, y, channel_name, outDATETIME, label_activity, label_eruptio
     if not y_log:
         ax.set(ylabel='Reconstruction distance')
         ax.plot(x, y, color='green')
-        if epoch == None:
+        if epoch is None:
             title = "Graph CH_" + str(channel_name)
         else:
             title = "Graph CH_" + str(channel_name) + f" (epoch {epoch})"
@@ -145,7 +145,7 @@ def plotSetup(ax, x, y, channel_name, outDATETIME, label_activity, label_eruptio
         ax.set(ylabel='Reconstruction distance (LOG scale)')
         ax.plot(x, y, color='dodgerblue')
         ax.set_yscale('log')
-        if epoch == None:
+        if epoch is None:
             title = "Graph (LOG y-scale) CH_" + str(channel_name)
         else:
             title = "Graph (LOG y-scale) CH_" + str(channel_name) + f" (epoch {epoch})"
@@ -172,7 +172,7 @@ def plotAndSaveGraphs(dist_ch, channel_name, outDATETIME, label_activity, label_
         folder = img_location
     folder = os.path.join(folder, "testing")
     os.makedirs(folder, exist_ok=True)
-    if epoch == None:
+    if epoch is None:
         name_file = "CH_" + str(channel_name) + ".png"
     else:
         name_file = "CH_" + str(channel_name) + f"_epoch{epoch:05d}" + ".png"
@@ -219,12 +219,12 @@ if __name__ == '__main__':
     # Save number of channels
     example, _, _ = test_dataset[0]
     args['data_channels'] = example.shape[0]  # 0=channel, 1=chunk
-    if(args['channels_list'] is None):
+    if args['channels_list'] is None:
         args['channels_list'] = torch.arange(args['data_channels'])
     else:
         args['channels_list'] = torch.tensor(
             args['channels_list'], dtype=torch.int32)
-    if(args['data_channels'] != hyperparams['data_channels']):
+    if args['data_channels'] != hyperparams['data_channels']:
         raise AttributeError(
             "Channels number of checkpoint is not equal to channels number of TestSet!")
     print("Channels: " + str(args['channels_list'].numpy()))
@@ -244,7 +244,7 @@ if __name__ == '__main__':
     model.eval()
     model.to(args['device'])
 
-    # Model evalutation
+    # Model evaluation
     out = []
     with torch.no_grad():
         for sig, _, _ in tqdm(test_loader, desc='Testing'):
@@ -256,12 +256,12 @@ if __name__ == '__main__':
     outLABEL = []
     outTIMESTAMP = []
     for i, sig_batch in enumerate(tqdm(out, desc='Elaborating')):
-        for j in range(sig_batch.shape[0]): # batch
+        for j in range(sig_batch.shape[0]):  # batch
             tmp_sig = torch.zeros(sig_batch.shape[1:])
-            for k in range(sig_batch.shape[1]): # channel
+            for k in range(sig_batch.shape[1]):  # channel
                 # Ignore reconstruction distance if signal is all 0 (station off)
                 if test_dataset[i*args['batch_size']+j][0][k].sum(0) != 0:
-                    tmp_sig[k] = test_dataset[i*args['batch_size']+j][0][k] - sig_batch[j,k]
+                    tmp_sig[k] = test_dataset[i*args['batch_size']+j][0][k] - sig_batch[j, k]
             outLIN.append(tmp_sig)
             outLABEL.append(test_dataset[i*args['batch_size']+j][1])
             outTIMESTAMP.append(test_dataset[i*args['batch_size']+j][2])

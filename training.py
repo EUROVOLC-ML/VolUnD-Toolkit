@@ -188,7 +188,7 @@ if __name__ == '__main__':
     # Save number of channels
     example, _, _ = train_dataset[0]
     args['data_channels'] = example.shape[0]  # 0=channel, 1=chunk
-    if(args['channels_list'] is None):
+    if args['channels_list'] is None:
         args['channels_list'] = torch.arange(args['data_channels'])
     else:
         args['channels_list'] = torch.tensor(

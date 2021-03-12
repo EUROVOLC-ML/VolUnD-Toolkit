@@ -21,7 +21,7 @@ def read_file(file_path):
     try:
         label = []
         label.append(data_load['fragment']['current_label'][0][0][0][0])
-    except(KeyError):
+    except KeyError:
         print("Label not found: assume all events of class 0 (normal)!")
         label = torch.zeros(len(timestamp)).tolist()
 
@@ -35,7 +35,7 @@ def read_file_info(file_path, channels_list):
     # Check if channels name exist on file read and extract it or set to value of channels_list
     try:
         channels_name = data_load['CHANNEL_NAMES']
-    except(KeyError):
+    except KeyError:
         print("Channel Name not found.")
         if channels_list is not None:
             channels_name = [str(channels_list[i])
@@ -43,6 +43,5 @@ def read_file_info(file_path, channels_list):
         else:
             tmp = torch.arange(data_load['DATA'].shape[0])
             channels_name = [str(tmp[i].item()) for i in range(tmp.shape[0])]
-        #channels_name = ['STRA', 'STR1']
 
     return channels_name

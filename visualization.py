@@ -4,6 +4,7 @@ import os
 import threading
 import webbrowser
 
+
 def parse():
     """
     Load args from file. Tries to convert them to best type.
@@ -39,7 +40,7 @@ def parse():
 
             # Verify setup integrity
             if not all(key in output.keys() for key in ['logs_dir',
-                                            'tensorboard_port']):
+                                                        'tensorboard_port']):
                 raise AttributeError("Params consistency broken!")
     except (FileNotFoundError, AttributeError, Exception):
         print("Restoring original params value in the setup file... please try to reconfigure setup.")
@@ -56,7 +57,8 @@ tensorboard_port: 6006")
 
     # Return
     return output
-    
+
+
 if __name__ == '__main__':
     # Get params
     args = parse()

@@ -1,7 +1,7 @@
 import torch
 from torch.utils.data import Dataset as TorchDataset
 import os
-os.environ['FOR_DISABLE_CONSOLE_CTRL_HANDLER'] = '1' # fix ctrl+c scipy bug
+os.environ['FOR_DISABLE_CONSOLE_CTRL_HANDLER'] = '1'  # fix ctrl+c scipy bug
 from tqdm import tqdm
 from random import randint
 from scipy import signal
@@ -76,6 +76,7 @@ class FSProvider(TorchDataset):
 
         # Check if data_dir is a file list
         if os.path.isfile(self.data_dir):
+            file_list = []
             if self.data_dir.lower().endswith('.pt'):
                 file_list = torch.load(self.data_dir)
             elif self.data_dir.lower().endswith('.txt'):
@@ -164,9 +165,9 @@ class FSProvider(TorchDataset):
                     label_list = []
                     # Check training mode
                     if self.training_labels is not None:
-                        for i in range(len(label)):
-                            if label[i] in self.training_labels:
-                                label_list.append(i)
+                        for lab in range(len(label)):
+                            if label[lab] in self.training_labels:
+                                label_list.append(lab)
 
                     # Get only selected channels
                     if self.channels_list is not None:
@@ -285,6 +286,7 @@ class RAMProvider(TorchDataset):
 
         # Check if data_dir is a file list
         if os.path.isfile(data_dir):
+            file_list = []
             if data_dir.lower().endswith('.pt'):
                 file_list = torch.load(data_dir)
             elif data_dir.lower().endswith('.txt'):
@@ -435,7 +437,7 @@ class Dataset(TorchDataset):
                                        chunk_rate=chunk_rate,
                                        chunk_random_crop=chunk_random_crop,
                                        data_sampling_frequency=data_sampling_frequency,
-                                       hunk_linear_subsample=chunk_linear_subsample,
+                                       chunk_linear_subsample=chunk_linear_subsample,
                                        chunk_butterworth_lowpass=chunk_butterworth_lowpass,
                                        chunk_butterworth_highpass=chunk_butterworth_highpass,
                                        chunk_butterworth_order=chunk_butterworth_order,

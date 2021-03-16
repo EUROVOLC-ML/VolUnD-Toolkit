@@ -7,7 +7,7 @@ The toolkit is developed in Python 3 using the PyTorch library, and is structure
 
 The root directory contains the following folders:
 - **cache** (internal use): storage directory for internally-processed dataset.
-- **dataset**: directory containing default locations for train/validation/test files. Each directory can contain an arbitrary number of files, each of which must be saved in PyTorch format (using torch.save) in dictionary format, containing the following keys
+- **dataset**: directory containing default locations for train/validation/test files. Each directory can contain an arbitrary number of files, each of which must be saved in PyTorch format (using torch.save) in dictionary format, containing the following keys:
   - CHANNELS_NAME (optional): list of name for each channels,
   - TIME_DESC (optional): natural-language description of the temporal interval of represented in the file
   - DATA: float tensor of size “stations × number of signals × chunk length
@@ -25,8 +25,8 @@ The main files in the toolkit are:
 		key: value
 		where “key” is an option name, and “value” is the corresponding value. String values should be quoted; numeric values should not be quoted; unspecified values can be provided as “None” (unquoted); list values can be grouped between brackets.
 		Possible options are:
-  - train_dir: folder (or file list) where the dataset files for the training phase are located
-  - val_dir: folder (or file list) where the dataset files for the validation phase are located
+  - train_dir: folder (or file list in PyTorch or JSON format) where the dataset files for the training phase are located
+  - val_dir: folder (or file list in PyTorch or JSON format) where the dataset files for the validation phase are located
   - data_location: folder where the dataset files are located, used only if train_dir or val_dir are file lists
   - chunk_len: chunk length (i.e., temporal length of the a single input to the model); default 512
   - chunk_only_one: take one or all chunk of single signal; default False
@@ -41,8 +41,8 @@ The main files in the toolkit are:
   - channels_name: if present, list of channels name (i.e., name of input stations); default “None”
   - batch_size: mini-batch size for gradient descent; default 128
   - data_provider: specifies whether data should be stored on RAM (faster; value “ram”) or should be read from the filesystem (slower; value “fs”); default “ram”
-  - mean: if not None, list of per-channel means for standardization; default None
-  - std: if not None, list of per-channel standard deviations for standardization; default None
+  - mean: if not None, list (or file in PyTorch or JSON format) of per-channel means for standardization; default None
+  - std: if not None, list (or file in PyTorch or JSON format) of per-channel standard deviations for standardization; default None
   - training_labels if not None, list of normal activity labels; default [0]
   - tag: name to assign to the training session in the web dashboard
   - log_dir: folder where to save the training data

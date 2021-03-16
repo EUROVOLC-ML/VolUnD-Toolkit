@@ -6,6 +6,7 @@ from tqdm import tqdm
 from random import randint
 from scipy import signal
 from fileReader.readFile import read_file, read_file_info
+import json
 
 if os.name == 'nt':
     import win32api
@@ -31,14 +32,14 @@ class FSProvider(TorchDataset):
     def __init__(self, data_dir, data_location, chunk_len, chunk_only_one=False, chunk_rate=1, chunk_random_crop=False, data_sampling_frequency=None, chunk_linear_subsample=1, chunk_butterworth_lowpass=None, chunk_butterworth_highpass=None, chunk_butterworth_order=2, channels_list=None, channels_name=None, cache_dir='./cache', training_labels=None):
         """
         Args:
-        - data_dir (string): path to directory containing files.
-        - data_location (string): path to directory containing files (if data_dir is a file list).
+        - data_dir (string): path to directory containing files
+        - data_location (string): path to directory containing files (if data_dir is a file list)
         - chunk_len (int): length of each item returned by the dataset
         - chunk_only_one (boolean): take one or all chunk of single signal
         - chunk_rate (int): if chunk_only_one=False, take one chunk every chunk_rate
         - chunk_random_crop (boolean): if chunk_only_one=True, take one chunk randomly in single signal
         - data_sampling_frequency (int): set frequency (Hz) of input signals 
-        - chunk_linear_subsample (int): apply linear subsample to sigle signal, MUST BE A POWER OF 2 (1,2,4,8,16,32,64,128...)
+        - chunk_linear_subsample (int): apply linear subsample to sigle signal, MUST BE POWER OF 2 (1,2,4,8,16,32,64,128...)
         - chunk_butterworth_lowpass (int): if not None, apply butterworth low pass filter at chunk_butterworth_lowpass Hz
         - chunk_butterworth_highpass (int): if not None, apply butterworth high pass filter at chunk_butterworth_highpass Hz
         - chunk_butterworth_order (int): set order of butterworth filter
@@ -80,13 +81,14 @@ class FSProvider(TorchDataset):
         if os.path.isfile(self.data_dir):
             file_list = []
             if self.data_dir.lower().endswith('.pt'):
-                file_list = torch.load(self.data_dir)
+                file_list = torch.load(self.data_dir)[os.path.basename(self.data_dir)[:-3]]
             elif self.data_dir.lower().endswith('.txt'):
                 with open(self.data_dir) as infile:
                     for line in infile:
                         file_list.append(line)
             elif self.data_dir.lower().endswith('.json'):
-                raise NotImplementedError("JSON import not yet implemented!")
+                with open(self.data_dir, "r") as infile:
+                    file_list = json.load(infile)[os.path.basename(self.data_dir)[:-5]]
             else:
                 raise AttributeError("Broken file list")
 
@@ -121,7 +123,7 @@ class FSProvider(TorchDataset):
         if self.channels_name is None:
             self.channels_name = read_file_info(os.path.join(self.data_dir, self.files[0]), self.channels_list)
         elif len(self.channels_name) is not len(read_file_info(os.path.join(self.data_dir, self.files[0]), self.channels_list)):
-            raise AttributeError("channels_name must have same lenght of signal channels!")
+            raise AttributeError("channels_name must have same length of signal channels!")
 
         # Get dataset name for cache
         cache_name = os.path.basename(self.data_dir).replace(
@@ -166,26 +168,27 @@ class FSProvider(TorchDataset):
                     # Read file
                     data, label, timestamp = read_file(file)
 
-                    label_list = []
-                    # Check training mode
-                    if self.training_labels is not None:
-                        for lab in range(len(label)):
-                            if label[lab] in self.training_labels:
-                                label_list.append(lab)
-
                     # Get only selected channels
                     if self.channels_list is not None:
                         # channel can be a list
-                        data = data[self.channels_list, label_list, :]
+                        data = data[self.channels_list, :, :]
+
+                    # Check training mode
+                    if self.training_labels is not None:
+                        label_list = []
+                        for i in range(len(label)):
+                            if label[i] in self.training_labels:
+                                label_list.append(i)
+                        data = data[:, label_list, :]
 
                     # Get length
                     length = data.shape[1]
-                    sublenght = data.shape[2]
+                    sublength = data.shape[2]
 
                     # Compute chunk starts
                     chunk_starts = range(0, length, 1)
                     chunk_part_starts = range(
-                        0, int(sublenght/self.chunk_len), 1)
+                        0, int(sublength/self.chunk_len), 1)
 
                     # Prepare item info
                     if self.chunk_only_one:
@@ -269,8 +272,8 @@ class RAMProvider(TorchDataset):
     def __init__(self, data_dir, data_location, chunk_len, chunk_only_one=False, chunk_rate=1, chunk_random_crop=False, data_sampling_frequency=None, chunk_linear_subsample=1, chunk_butterworth_lowpass=None, chunk_butterworth_highpass=None, chunk_butterworth_order=2, channels_list=None, channels_name=None, cache_dir='./cache', training_labels=None):
         """
         Args:
-        - data_dir (string): path to directory containing files.
-        - data_location (string): path to directory containing files (if data_dir is a file list).
+        - data_dir (string): path to directory containing files
+        - data_location (string): path to directory containing files (if data_dir is a file list)
         - chunk_len (int): length of each item returned by the dataset
         - chunk_only_one (boolean): take one or all chunk of single signal
         - chunk_rate (int): if chunk_only_one=False, take one chunk every chunk_rate
@@ -293,13 +296,14 @@ class RAMProvider(TorchDataset):
         if os.path.isfile(data_dir):
             file_list = []
             if data_dir.lower().endswith('.pt'):
-                file_list = torch.load(data_dir)
+                file_list = torch.load(data_dir)[os.path.basename(data_dir)[:-3]]
             elif data_dir.lower().endswith('.txt'):
                 with open(data_dir) as infile:
                     for line in infile:
                         file_list.append(line)
             elif data_dir.lower().endswith('.json'):
-                raise NotImplementedError("JSON import not yet implemented!")
+                with open(data_dir, "r") as infile:
+                    file_list = json.load(infile)[os.path.basename(data_dir)[:-5]]
             else:
                 raise AttributeError("Broken file list")
 
@@ -401,7 +405,6 @@ class Dataset(TorchDataset):
         Args:
         - data_dir (string): path to directory containing files.
         - data_location (string): path to directory containing files (if data_dir is a file list).
-        - normalize (dict): contains tensors with mean and std (if None, don't normalize)
         - chunk_len (int): length of each item returned by the dataset
         - chunk_only_one (boolean): take one or all chunk of single signal
         - chunk_rate (int): if chunk_only_one=False, take one chunk every chunk_rate
@@ -411,6 +414,7 @@ class Dataset(TorchDataset):
         - chunk_butterworth_lowpass (int): if not None, apply butterworth low pass filter at chunk_butterworth_lowpass Hz
         - chunk_butterworth_highpass (int): if not None, apply butterworth high pass filter at chunk_butterworth_highpass Hz
         - chunk_butterworth_order (int): set order of butterworth filter
+        - normalize_params (dict): contains tensors with mean and std (if None, don't normalize)
         - channels_list (list of int): if not None, select channel (with given index) from data
         - channels_name (list of string): if not None, set name of channels (stations)
         - cache_dir (string): path to directory where dataset information are cached
@@ -458,14 +462,22 @@ class Dataset(TorchDataset):
         # Store normalization params
         self.normalize_params = normalize_params
         if (self.normalize_params['mean'] is not None) and (self.normalize_params['std'] is not None):
-            self.norm_mean = torch.FloatTensor(normalize_params['mean'])
-            self.norm_std = torch.FloatTensor(normalize_params['std'])
-            # Check lenght list
+            if isinstance(self.normalize_params['mean'], list) and isinstance(self.normalize_params['std'], list):
+                self.norm_mean = torch.FloatTensor(normalize_params['mean'])
+                self.norm_std = torch.FloatTensor(normalize_params['std'])
+            elif os.path.isfile(self.normalize_params['mean']) and os.path.isfile(self.normalize_params['std']):
+                if self.normalize_params['mean'].lower().endswith('.pt') and self.normalize_params['std'].lower().endswith('.pt'):
+                    self.norm_mean = torch.FloatTensor(torch.load(normalize_params['mean'])['mean'])
+                    self.norm_std = torch.FloatTensor(torch.load(normalize_params['std'])['std'])
+                elif self.normalize_params['mean'].lower().endswith('.json') and self.normalize_params['std'].lower().endswith('.json'):
+                    with open(normalize_params['mean'], "r") as infile:
+                        self.norm_mean = torch.FloatTensor(json.load(infile)['mean'])
+                    with open(normalize_params['std'], "r") as infile:
+                        self.norm_std = torch.FloatTensor(json.load(infile)['std'])
+            # Check length list
             if self.provider[0][0].shape[0] != len(self.norm_mean) and self.provider[0][0].shape[0] != len(self.norm_std):
-                raise AttributeError(
-                    "MEAN and STD list must have same lenght of channels!")
-            print("Normalization params: MEAN=" +
-                  str(self.norm_mean) + " & STD=" + str(self.norm_std))
+                raise AttributeError("MEAN and STD list must have same length of channels!")
+            print("Normalization params: MEAN=" + str(self.norm_mean) + " & STD=" + str(self.norm_std))
 
     def __len__(self):
         return len(self.provider)

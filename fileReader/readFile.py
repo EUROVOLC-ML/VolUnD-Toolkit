@@ -27,12 +27,11 @@ def read_file_info(file_path, channels_list):
 
     # Check if channels name exist on file read and extract it or set to value of channels_list
     try:
-        channels_name = data_load['CHANNELS_NAME']
+        channels_name = [data_load['CHANNELS_NAME'][i] for i in channels_list] 
     except KeyError:
         print("Channel Name not found.")
         if channels_list is not None:
-            channels_name = [str(channels_list[i])
-                             for i in range(len(channels_list))]
+            channels_name = [str(channels_list[i]) for i in range(len(channels_list))]
         else:
             tmp = torch.arange(data_load['DATA'].shape[0])
             channels_name = [str(tmp[i].item()) for i in range(tmp.shape[0])]

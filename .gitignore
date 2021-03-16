@@ -1,0 +1,17 @@
+*__pycache__*
+.ipynb_checkpoints/*
+.vscode/*
+.idea/*
+cache/*
+dataset/*
+dataset/testSet/*
+dataset/trainingSet/*
+dataset/validationSet/*
+logs/*
+
+
+!cache/.gitkeep
+!dataset/testSet/.gitkeep
+!dataset/testSet/.gitkeep
+!dataset/testSet/.gitkeep
+!logs/.gitkeep

@@ -275,7 +275,7 @@ class Model(nn.Module):
 
     def loss(self, recon_x, x, mu, logvar):
         # MSE loss
-        loss = F.mse_loss(recon_x, x, reduction='sum')
+        loss = F.mse_loss(recon_x, x, reduction='mean')
 
         # Only if variational AE
         if self.enable_variational:

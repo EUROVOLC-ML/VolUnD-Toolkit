@@ -119,6 +119,14 @@ class FSProvider(TorchDataset):
         else:
             self.butterworth_sos = None
 
+        # Get channels_list
+        if self.channels_list is None:
+            data_example, _, _ = read_file(self.files[0])
+            self.channels_list = torch.arange(data_example.shape[0])
+        else:
+            self.channels_list = torch.tensor(self.channels_list, dtype=torch.int32)
+        print("Channels: " + str(self.channels_list.numpy()))
+        
         # Get channels name
         if self.channels_name is None:
             self.channels_name = read_file_info(os.path.join(self.data_dir, self.files[0]), self.channels_list)

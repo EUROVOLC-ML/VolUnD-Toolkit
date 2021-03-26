@@ -190,14 +190,8 @@ if __name__ == '__main__':
                           provider=args['data_provider'])
 
     # Save number of channels
-    example, _, _ = train_dataset[0]
-    args['data_channels'] = example.shape[0]  # 0=channel, 1=chunk
-    if args['channels_list'] is None:
-        args['channels_list'] = torch.arange(args['data_channels'])
-    else:
-        args['channels_list'] = torch.tensor(
-            args['channels_list'], dtype=torch.int32)
-    print("Channels: " + str(args['channels_list'].numpy()))
+    args['data_channels'] = len(train_dataset.channels_list)
+    args['channels_list'] = train_dataset.channels_list
 
     # Setup dataset dictionary
     args['datasets'] = {'trainingSet': train_dataset,

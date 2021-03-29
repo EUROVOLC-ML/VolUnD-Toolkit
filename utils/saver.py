@@ -185,7 +185,7 @@ class Saver(object):
             if verbose:
                 print(f'Best checkpoint found: {checkpoint} (loss: {loss}).')
         elif model_path.is_file():
-            if not model_path.endsWith('.pth'):
+            if not model_path.as_posix().endswith('.pth'):
                 raise OSError('Please provide a valid path for restore checkpoint.')
             checkpoint = model_path
 

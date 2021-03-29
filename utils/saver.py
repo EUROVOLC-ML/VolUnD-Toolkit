@@ -128,8 +128,9 @@ class Saver(object):
         if not hyperparams_path.exists():
             raise OSError('Please provide a valid checkpoints path')
         if hyperparams_path.is_dir():
-            hyperparams_path = os.path.join(
-                hyperparams_path, 'hyperparams.txt')
+            hyperparams_path = os.path.join(hyperparams_path, 'hyperparams.txt')
+        else:
+            hyperparams_path = os.path.join(hyperparams_path.parent, 'hyperparams.txt')
         # Prepare output
         output = {}
         # Read file
@@ -160,8 +161,7 @@ class Saver(object):
         """
         model_path = Path(model_path)
         if not model_path.exists():
-            raise OSError(
-                'Please provide a valid path for restore checkpoint.')
+            raise OSError('Please provide a valid path for restore checkpoint.')
 
         if model_path.is_dir():
             # Check there are files in that directory
@@ -185,6 +185,8 @@ class Saver(object):
             if verbose:
                 print(f'Best checkpoint found: {checkpoint} (loss: {loss}).')
         elif model_path.is_file():
+            if model_path[-4:] != '.pth':
+                raise OSError('Please provide a valid path for restore checkpoint.')
             checkpoint = model_path
 
         if verbose:

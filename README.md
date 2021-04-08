@@ -12,7 +12,7 @@ The root directory contains the following folders:
   - TIME_DESC (optional): natural-language description of the temporal interval of represented in the file
   - DATA: float tensor of size “stations × number of signals × chunk length
   - LABEL (optional): 0 for no activity or normal activity, 1 for e.g. mild volcanic activity, 2 for e.g. energetic eruptive activity ; if not provided, non-normal events will not be emphasized during visualization 
-  - TIMESTAMP: list of Unix timestamps of size “number of signals”, corresponding to the signals in DATA
+  - TIMESTAMP: list of Unix timestamps of size “number of signals”, corresponding to the end of the signals in DATA
 - **fileReader** (for Advanced user): directory containing the function to read dataset files. Modify it if you want to use your own datatet files (without any adaptation to our format).
 - **logs**: directory where training sessions are saved.
 - **utils** (internal use): directory containing the main source code.

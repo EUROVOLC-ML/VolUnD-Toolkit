@@ -8,7 +8,7 @@ def read_file(file_path):
     # Extract signal data from file read
     data = data_load['DATA']
 
-    # Extract timestamp data from file read
+    # Extract timestamp of the end of the signals from file read 
     timestamp = data_load['TIMESTAMP']
 
     # Check if label data exist on file read and extract it or set to 0 (normal activity)

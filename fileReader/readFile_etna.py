@@ -12,10 +12,9 @@ def read_file(file_path):
     # Extract signal data from file read
     data = torch.Tensor(data_load['fragment']['data'][0][0]).unsqueeze(1)
 
-    # Extract timestamp data from file read
+    # Extract timestamp of the end of the signals from file read
     timestamp = []
-    timestamp.append((datetime.strptime(
-        file_name[0:6], "%y%m%d") + timedelta(minutes=int(file_name[7:10])*10)).timestamp())
+    timestamp.append((datetime.strptime(file_name[0:6], "%y%m%d") + timedelta(minutes=int(file_name[7:10])*10)).timestamp())
 
     # Check if label data exist on file read and extract it or set to 0 (normal activity)
     try:

@@ -124,7 +124,7 @@ class FSProvider(TorchDataset):
             data_example, _, _ = read_file(self.files[0])
             self.channels_list = torch.arange(data_example.shape[0])
         else:
-            self.channels_list = torch.tensor(self.channels_list, dtype=torch.int32)
+            self.channels_list = torch.tensor(self.channels_list)
         print("Channels: " + str(self.channels_list.numpy()))
         
         # Get channels name
@@ -255,7 +255,7 @@ class FSProvider(TorchDataset):
         # Get chunk
         chunk = data[:, chunk_start, point_list]
         label_chunk = label[chunk_start]
-        time_chunk = timestamp[chunk_start] + int(m1/self.data_sampling_frequency)
+        time_chunk = timestamp[chunk_start] - int(data.shape[2]/self.data_sampling_frequency - m2/self.data_sampling_frequency)
 
         # Free whole data storage
         chunk = chunk.clone()
@@ -270,6 +270,9 @@ class FSProvider(TorchDataset):
 
     def get_channels_name(self):
         return self.channels_name
+
+    def get_channels_list(self):
+        return self.channels_list
 
 
 class RAMProvider(TorchDataset):
@@ -388,8 +391,9 @@ class RAMProvider(TorchDataset):
                 data, label, timestamp = fs_provider[i]
                 # Add to data
                 self.data.append((data, label, timestamp))
-            # Read channels name
+            # Read channels info
             self.channels_name = fs_provider.get_channels_name()
+            self.channels_list = fs_provider.get_channels_list()
             setup_map['channels_name'] = self.channels_name
             # Save data
             print(f'Saving data: {cache_path}')
@@ -404,6 +408,9 @@ class RAMProvider(TorchDataset):
 
     def get_channels_name(self):
         return self.channels_name
+
+    def get_channels_list(self):
+        return self.channels_list
 
 
 class Dataset(TorchDataset):
@@ -467,6 +474,10 @@ class Dataset(TorchDataset):
                                        cache_dir=cache_dir,
                                        training_labels=training_labels)
 
+        # Read channels info
+        self.channels_name = self.provider.get_channels_name()
+        self.channels_list = self.provider.get_channels_list()
+        
         # Store normalization params
         self.normalize_params = normalize_params
         if (self.normalize_params['mean'] is not None) and (self.normalize_params['std'] is not None):
@@ -507,4 +518,7 @@ class Dataset(TorchDataset):
         return data_tmp, label, timestamp
 
     def get_channels_name(self):
-        return self.provider.get_channels_name()
+        return self.channels_name
+
+    def get_channels_list(self):
+        return self.channels_list

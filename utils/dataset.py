@@ -195,8 +195,7 @@ class FSProvider(TorchDataset):
 
                     # Compute chunk starts
                     chunk_starts = range(0, length, 1)
-                    chunk_part_starts = range(
-                        0, int(sublength/self.chunk_len), 1)
+                    chunk_part_starts = range(0, int(sublength/self.chunk_len), 1)
 
                     # Prepare item info
                     if self.chunk_only_one:
@@ -240,8 +239,7 @@ class FSProvider(TorchDataset):
             self.curr_file_data = (data, label, timestamp)
 
         # Select channel
-        if self.channels_list is not None:
-            data = data[self.channels_list, :, :]
+        data = data[self.channels_list, :, :]
 
         # Calculate chunk
         if self.chunk_only_one and self.chunk_random_crop:
@@ -262,8 +260,7 @@ class FSProvider(TorchDataset):
 
         # Apply Butterworth filter
         if self.butterworth_sos is not None:
-            chunk = torch.tensor(signal.sosfiltfilt(
-                self.butterworth_sos, chunk).copy())
+            chunk = torch.tensor(signal.sosfiltfilt(self.butterworth_sos, chunk).copy())
 
         # Return
         return chunk, label_chunk, time_chunk
@@ -338,7 +335,7 @@ class RAMProvider(TorchDataset):
         setup_map = {'files': self.files,
                      'data_dir': os.path.basename(data_dir),
                      'training_labels': training_labels,
-                     'channels_list': channels_list,
+                     'channels_list_setup': channels_list,
                      'channels_name_setup': channels_name,
                      'chunk_len': chunk_len,
                      'chunk_only_one': chunk_only_one,
@@ -355,8 +352,10 @@ class RAMProvider(TorchDataset):
             # Load cached data
             print(f'RAMProvider: loading cache {cache_path}')
             self.data, setup_map_loaded = torch.load(cache_path)
-            # Save channels name and remove it for comparison
+            # Save channels info and remove it for comparison
+            self.channels_list = setup_map_loaded['channels_list']
             self.channels_name = setup_map_loaded['channels_name']
+            del setup_map_loaded['channels_list']
             del setup_map_loaded['channels_name']
             # Check if cache is up to date
             if setup_map == setup_map_loaded:
@@ -395,6 +394,7 @@ class RAMProvider(TorchDataset):
             self.channels_name = fs_provider.get_channels_name()
             self.channels_list = fs_provider.get_channels_list()
             setup_map['channels_name'] = self.channels_name
+            setup_map['channels_list'] = self.channels_list
             # Save data
             print(f'Saving data: {cache_path}')
             os.makedirs(self.cache_dir, exist_ok=True)
@@ -482,21 +482,21 @@ class Dataset(TorchDataset):
         self.normalize_params = normalize_params
         if (self.normalize_params['mean'] is not None) and (self.normalize_params['std'] is not None):
             if isinstance(self.normalize_params['mean'], list) and isinstance(self.normalize_params['std'], list):
-                self.norm_mean = torch.FloatTensor(normalize_params['mean'])
-                self.norm_std = torch.FloatTensor(normalize_params['std'])
+                self.norm_mean = torch.Tensor(normalize_params['mean'])
+                self.norm_std = torch.Tensor(normalize_params['std'])
             elif os.path.isfile(self.normalize_params['mean']) and os.path.isfile(self.normalize_params['std']):
                 if self.normalize_params['mean'].lower().endswith('.pt') and self.normalize_params['std'].lower().endswith('.pt'):
-                    self.norm_mean = torch.FloatTensor(torch.load(normalize_params['mean'])['mean'])
-                    self.norm_std = torch.FloatTensor(torch.load(normalize_params['std'])['std'])
+                    self.norm_mean = torch.Tensor(torch.load(normalize_params['mean'])['mean'])
+                    self.norm_std = torch.Tensor(torch.load(normalize_params['std'])['std'])
                 elif self.normalize_params['mean'].lower().endswith('.json') and self.normalize_params['std'].lower().endswith('.json'):
                     with open(normalize_params['mean'], "r") as infile:
-                        self.norm_mean = torch.FloatTensor(json.load(infile)['mean'])
+                        self.norm_mean = torch.Tensor(json.load(infile)['mean'])
                     with open(normalize_params['std'], "r") as infile:
-                        self.norm_std = torch.FloatTensor(json.load(infile)['std'])
+                        self.norm_std = torch.Tensor(json.load(infile)['std'])
             # Check length list
             if self.provider[0][0].shape[0] != len(self.norm_mean) and self.provider[0][0].shape[0] != len(self.norm_std):
                 raise AttributeError("MEAN and STD list must have same length of channels!")
-            print("Normalization params: MEAN=" + str(self.norm_mean) + " & STD=" + str(self.norm_std))
+            print("Normalization params: \n\tMEAN=" + str(self.norm_mean.numpy()) + "\n\tSTD=" + str(self.norm_std.numpy()))
 
     def __len__(self):
         return len(self.provider)

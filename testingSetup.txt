@@ -6,8 +6,10 @@
 checkpoint: './logs/yyyy-mm-dd_hh-mm-ss_ae/'
 
 # Dataset options
+train_dir: './dataset/trainingSet'
 test_dir: './dataset/testSet'
 data_location: './path/to/data/'
+CDF_mode: True
 chunk_len: 512
 chunk_only_one: False
 chunk_rate: 1
@@ -23,6 +25,7 @@ batch_size: 128
 data_provider: 'ram'
 mean: None
 std: None
+training_labels: [0]
 label_activity: [1]
 label_eruption: [2]
 

@@ -43,7 +43,7 @@ The main files in the toolkit are:
   - data_provider: specifies whether data should be stored on RAM (faster; value “ram”) or should be read from the filesystem (slower; value “fs”); default “ram”
   - mean: if not None, list (or file in PyTorch or JSON format) of per-channel means for standardization; default None
   - std: if not None, list (or file in PyTorch or JSON format) of per-channel standard deviations for standardization; default None
-  - training_labels if not None, list of normal activity labels; default [0]
+  - training_labels: if not None, list of normal activity labels; default [0]
   - tag: name to assign to the training session in the web dashboard
   - log_dir: folder where to save the training data
   - plot_every: defines how often (number of iterations) dashboard figures (inputs, reconstructions) should be updated; default 1000
@@ -72,7 +72,10 @@ The main files in the toolkit are:
   - tensorboard_port: set tensorboard port to view telemetry on browser; default 6006
 - **testingSetup.txt**: to configure the testing parameters. Parameters:
   - checkpoint: model to be validated (it can be a specific checkpoint file or the folder containing all checkpoints; in this case, the best checkpoint based on training loss will be selected)
+  - train_dir: as above
   - test_dir: folder where the dataset files for the testing phase are located
+  - data_location: as above
+  - CDF_mode: show reconstruction distances as percentual using Probability Density Function derived from Cumulative Distribution Function of trainingSet
   - chunk_len: as above
   - chunk_only_one: as above
   - chunk_rate: as above
@@ -88,6 +91,7 @@ The main files in the toolkit are:
   - data_provider: as above
   - mean: as above
   - std: as above
+  - training_labels: as above
   - label_activity: list of pre-eruption activity labels; default [1]
   - label_eruption: list of eruption activity labels; default [2]
   - device: as above

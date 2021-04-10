@@ -60,6 +60,7 @@ def parse():
                                                         'mean',
                                                         'std',
                                                         'training_labels',
+                                                        'validation_labels',
                                                         'tag',
                                                         'log_dir',
                                                         'plot_every',
@@ -111,6 +112,7 @@ data_provider: 'ram'\n\
 mean: None\n\
 std: None\n\
 training_labels: [0]\n\
+validation_labels: None\n\
 \n\
 # Experiment options\n\
 tag: 'ae'\n\
@@ -172,7 +174,7 @@ if __name__ == '__main__':
                             channels_list=args['channels_list'],
                             channels_name=args['channels_name'],
                             provider=args['data_provider'],
-                            training_labels=args['training_labels'])
+                            labels=args['training_labels'])
     val_dataset = Dataset(args['val_dir'],
                           data_location=args['data_location'],
                           chunk_len=args['chunk_len'],
@@ -187,7 +189,8 @@ if __name__ == '__main__':
                           normalize_params=normalize_params,
                           channels_list=args['channels_list'],
                           channels_name=args['channels_name'],
-                          provider=args['data_provider'])
+                          provider=args['data_provider'],
+                          labels=args['validation_labels'])
 
     # Save number of channels
     args['data_channels'] = len(train_dataset.channels_list)

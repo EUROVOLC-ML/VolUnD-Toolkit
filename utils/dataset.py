@@ -29,7 +29,7 @@ class FSProvider(TorchDataset):
     Data provider from file system
     """
 
-    def __init__(self, data_dir, data_location, chunk_len, chunk_only_one=False, chunk_rate=1, chunk_random_crop=False, data_sampling_frequency=None, chunk_linear_subsample=1, chunk_butterworth_lowpass=None, chunk_butterworth_highpass=None, chunk_butterworth_order=2, channels_list=None, channels_name=None, cache_dir='./cache', training_labels=None):
+    def __init__(self, data_dir, data_location, chunk_len, chunk_only_one=False, chunk_rate=1, chunk_random_crop=False, data_sampling_frequency=None, chunk_linear_subsample=1, chunk_butterworth_lowpass=None, chunk_butterworth_highpass=None, chunk_butterworth_order=2, channels_list=None, channels_name=None, cache_dir='./cache', labels=None):
         """
         Args:
         - data_dir (string): path to directory containing files
@@ -46,7 +46,7 @@ class FSProvider(TorchDataset):
         - channels_list (list of int): if not None, select channel (with given index) from data
         - channels_name (list of string): if not None, set name of channels (stations)
         - cache_dir (string): path to directory where dataset information are cached
-        - training_labels (list of int): if not None, use only data (with given integer) of normal activity
+        - labels (list of int): if not None, use only data (with given integer) of normal activity
         """
 
         # Store args
@@ -61,7 +61,7 @@ class FSProvider(TorchDataset):
         self.cache_dir = os.path.abspath(cache_dir)
         self.channels_list = channels_list
         self.channels_name = channels_name
-        self.training_labels = training_labels
+        self.labels = labels
 
         # Check data_sampling_frequency
         if (self.data_sampling_frequency is None) or (self.data_sampling_frequency <= 0):
@@ -137,14 +137,14 @@ class FSProvider(TorchDataset):
         cache_name = os.path.basename(self.data_dir).replace(
             '/', '_').replace('\\', '_').replace('.', '_')
         cache_name += f'_fs_{chunk_len}_{chunk_only_one}_{chunk_rate}_{chunk_random_crop}_{chunk_linear_subsample}'
-        cache_name += f'_label_{"all" if  training_labels is None else "".join(str(l) for l in training_labels).replace(" ", "_")}'
+        cache_name += f'_label_{"all" if  labels is None else "".join(str(l) for l in labels).replace(" ", "_")}'
         cache_name += f'_ch_{"all" if  channels_list is None else "".join(str(c) for c in channels_list).replace(" ", "_")}'
         cache_path = os.path.join(self.cache_dir, cache_name)
 
         # Create setup map
         setup_map = {'files': self.files,
                      'data_dir': os.path.basename(self.data_dir),
-                     'training_labels': self.training_labels,
+                     'labels': self.labels,
                      'channels_list': self.channels_list,
                      'chunk_len': self.chunk_len,
                      'chunk_only_one': self.chunk_only_one,
@@ -182,10 +182,10 @@ class FSProvider(TorchDataset):
                         data = data[self.channels_list, :, :]
 
                     # Check training mode
-                    if self.training_labels is not None:
+                    if self.labels is not None:
                         label_list = []
                         for i in range(len(label)):
-                            if label[i] in self.training_labels:
+                            if label[i] in self.labels:
                                 label_list.append(i)
                         data = data[:, label_list, :]
 
@@ -213,7 +213,7 @@ class FSProvider(TorchDataset):
             # Check if data_map is empty
             if len(self.data_map) == 0:
                 raise FileExistsError(
-                    f"There isn't any data to use in {self.data_dir} (if training_labels is setted, please check data labels).")
+                    f"There isn't any data to use in {self.data_dir} (if labels is setted, please check data labels).")
             # Save data map
             print(f'Saving dataset list: {cache_path}')
             os.makedirs(self.cache_dir, exist_ok=True)
@@ -277,7 +277,7 @@ class RAMProvider(TorchDataset):
     Data provider from RAM
     """
 
-    def __init__(self, data_dir, data_location, chunk_len, chunk_only_one=False, chunk_rate=1, chunk_random_crop=False, data_sampling_frequency=None, chunk_linear_subsample=1, chunk_butterworth_lowpass=None, chunk_butterworth_highpass=None, chunk_butterworth_order=2, channels_list=None, channels_name=None, cache_dir='./cache', training_labels=None):
+    def __init__(self, data_dir, data_location, chunk_len, chunk_only_one=False, chunk_rate=1, chunk_random_crop=False, data_sampling_frequency=None, chunk_linear_subsample=1, chunk_butterworth_lowpass=None, chunk_butterworth_highpass=None, chunk_butterworth_order=2, channels_list=None, channels_name=None, cache_dir='./cache', labels=None):
         """
         Args:
         - data_dir (string): path to directory containing files
@@ -294,7 +294,7 @@ class RAMProvider(TorchDataset):
         - channels_list (list of int): if not None, select channel (with given index) from data
         - channels_name (list of string): if not None, set name of channels (stations)
         - cache_dir (string): path to directory where dataset information are cached
-        - training_labels (list of int): if not None, use only data (with given integer) of normal activity
+        - labels (list of int): if not None, use only data (with given integer) of normal activity
         """
 
         # Store args
@@ -327,14 +327,14 @@ class RAMProvider(TorchDataset):
         # Get dataset name for cache
         cache_name = os.path.basename(data_dir).replace('/', '_').replace('\\', '_').replace('.', '_')
         cache_name += f'_ram_{chunk_len}_{chunk_only_one}_{chunk_rate}_{chunk_random_crop}_{chunk_linear_subsample}'
-        cache_name += f'_label_{"all" if  training_labels is None else "".join(str(l) for l in training_labels).replace(" ", "_")}'
+        cache_name += f'_label_{"all" if  labels is None else "".join(str(l) for l in labels).replace(" ", "_")}'
         cache_name += f'_ch_{"all" if  channels_list is None else "".join(str(c) for c in channels_list).replace(" ", "_")}'
         cache_path = os.path.join(self.cache_dir, cache_name)
 
         # Create setup map
         setup_map = {'files': self.files,
                      'data_dir': os.path.basename(data_dir),
-                     'training_labels': training_labels,
+                     'labels': labels,
                      'channels_list_setup': channels_list,
                      'channels_name_setup': channels_name,
                      'chunk_len': chunk_len,
@@ -383,7 +383,7 @@ class RAMProvider(TorchDataset):
                                      channels_list=channels_list,
                                      channels_name=channels_name,
                                      cache_dir=cache_dir,
-                                     training_labels=training_labels)
+                                     labels=labels)
             # Read all files
             for i in tqdm(range(len(fs_provider))):
                 # Get data
@@ -415,7 +415,7 @@ class RAMProvider(TorchDataset):
 
 class Dataset(TorchDataset):
 
-    def __init__(self, data_dir, data_location, chunk_len, chunk_only_one=False, chunk_rate=1, chunk_random_crop=False, data_sampling_frequency=None, chunk_linear_subsample=1, chunk_butterworth_lowpass=None, chunk_butterworth_highpass=None, chunk_butterworth_order=2, normalize_params=None, channels_list=None, channels_name=None, cache_dir='./cache', training_labels=None, provider='ram'):
+    def __init__(self, data_dir, data_location, chunk_len, chunk_only_one=False, chunk_rate=1, chunk_random_crop=False, data_sampling_frequency=None, chunk_linear_subsample=1, chunk_butterworth_lowpass=None, chunk_butterworth_highpass=None, chunk_butterworth_order=2, normalize_params=None, channels_list=None, channels_name=None, cache_dir='./cache', labels=None, provider='ram'):
         """
         Args:
         - data_dir (string): path to directory containing files.
@@ -433,7 +433,7 @@ class Dataset(TorchDataset):
         - channels_list (list of int): if not None, select channel (with given index) from data
         - channels_name (list of string): if not None, set name of channels (stations)
         - cache_dir (string): path to directory where dataset information are cached
-        - training_labels (list of int): if not None, use only data (with given integer) of normal activity
+        - labels (list of int): if not None, use only data (with given integer) of normal activity
         - provider ('ram'|'fs'): pre-load data on RAM or load from file system
         """
 
@@ -456,7 +456,7 @@ class Dataset(TorchDataset):
                                         channels_list=channels_list,
                                         channels_name=channels_name,
                                         cache_dir=cache_dir,
-                                        training_labels=training_labels)
+                                        labels=labels)
         elif self.provider == 'fs':
             self.provider = FSProvider(data_dir,
                                        data_location=data_location,
@@ -472,7 +472,7 @@ class Dataset(TorchDataset):
                                        channels_list=channels_list,
                                        channels_name=channels_name,
                                        cache_dir=cache_dir,
-                                       training_labels=training_labels)
+                                       labels=labels)
 
         # Read channels info
         self.channels_name = self.provider.get_channels_name()

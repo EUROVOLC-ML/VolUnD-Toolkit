@@ -22,6 +22,7 @@ data_provider: 'ram'
 mean: None
 std: None
 training_labels: [0]
+validation_labels: None
 
 # Experiment options
 tag: 'ae'

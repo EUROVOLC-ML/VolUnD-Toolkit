@@ -43,7 +43,8 @@ The main files in the toolkit are:
   - data_provider: specifies whether data should be stored on RAM (faster; value “ram”) or should be read from the filesystem (slower; value “fs”); default “ram”
   - mean: if not None, list (or file in PyTorch or JSON format) of per-channel means for standardization; default None
   - std: if not None, list (or file in PyTorch or JSON format) of per-channel standard deviations for standardization; default None
-  - training_labels: if not None, list of normal activity labels; default [0]
+  - training_labels: list of normal activity labels to train model, if None select all available labels; default [0]
+  - validation_labels: list of activity labels to validate model, if None select all available labels; default None
   - tag: name to assign to the training session in the web dashboard
   - log_dir: folder where to save the training data
   - plot_every: defines how often (number of iterations) dashboard figures (inputs, reconstructions) should be updated; default 1000
@@ -92,6 +93,7 @@ The main files in the toolkit are:
   - mean: as above
   - std: as above
   - training_labels: as above
+  - test_labels: list of activity labels to test model, if None select all available labels; default None
   - label_activity: list of pre-eruption activity labels; default [1]
   - label_eruption: list of eruption activity labels; default [2]
   - device: as above

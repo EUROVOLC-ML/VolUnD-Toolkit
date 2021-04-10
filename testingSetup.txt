@@ -26,6 +26,7 @@ data_provider: 'ram'
 mean: None
 std: None
 training_labels: [0]
+test_labels: None
 label_activity: [1]
 label_eruption: [2]
 

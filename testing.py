@@ -79,6 +79,7 @@ def parse():
                                                         'mean',
                                                         'std',
                                                         'training_labels',
+                                                        'test_labels',
                                                         'label_activity',
                                                         'label_eruption',
                                                         'device',
@@ -116,6 +117,7 @@ data_provider: 'ram'\n\
 mean: None\n\
 std: None\n\
 training_labels: [0]\n\
+test_labels: None\n\
 label_activity: [1]\n\
 label_eruption: [2]\n\
 \n\
@@ -198,7 +200,7 @@ def getDist(args, normalize_params, train):
                            channels_list=args['channels_list'],
                            channels_name=args['channels_name'],
                            provider=args['data_provider'],
-                           training_labels=args['training_labels'] if train else None)
+                           labels=args['training_labels'] if train else args['test_labels'])
 
     # Instantiate loader
     loader = data.DataLoader(dataset, batch_size=args['batch_size'], shuffle=False, num_workers=0, drop_last=True)

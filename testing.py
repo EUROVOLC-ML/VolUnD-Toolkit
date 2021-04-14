@@ -11,7 +11,7 @@ from tqdm import tqdm
 from torch.utils import data
 from utils.model import Model
 from matplotlib import pyplot as plt
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from statsmodels.distributions.empirical_distribution import ECDF
 
 # Graph visualization on browser
@@ -229,7 +229,7 @@ def getDist(args, normalize_params, train):
                 outTIMESTAMP.append(dataset[i*args['batch_size']+j][2])
     outUNIONdiff = torch.stack(outLIN)
     if not train:
-        outDATETIME = [datetime.fromtimestamp(t) for t in outTIMESTAMP]
+        outDATETIME = [datetime.fromtimestamp(t, timezone.utc) for t in outTIMESTAMP]
 
     # Compute distance
     print("Compute distances per channel...")

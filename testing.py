@@ -208,7 +208,7 @@ def getDist(args, normalize_params, train):
     # Model evaluation
     out = []
     with torch.no_grad():
-        for sig, _, _ in tqdm(loader, desc='Training' if train else 'Testing'):
+        for sig, _, _, _ in tqdm(loader, desc='Training' if train else 'Testing'):
             rec, _, _ = model(sig.to(args['device']))
             out.append(rec.detach().cpu())
 
@@ -220,9 +220,11 @@ def getDist(args, normalize_params, train):
         for j in range(sig_batch.shape[0]):  # batch
             tmp_sig = torch.zeros(sig_batch.shape[1:])
             for k in range(sig_batch.shape[1]):  # channel
-                # Ignore reconstruction distance if signal is all 0 (station off)
-                if dataset[i*args['batch_size']+j][0][k].sum(0) != 0:
+                # Insert nan on reconstruction distance if signal is all 0 (station off)
+                if dataset[i*args['batch_size']+j][0][k].abs().max() != 0:
                     tmp_sig[k] = dataset[i*args['batch_size']+j][0][k] - sig_batch[j, k]
+                else:
+                    tmp_sig[k] = np.nan
             outLIN.append(tmp_sig)
             if not train:
                 outLABEL.append(dataset[i*args['batch_size']+j][1])

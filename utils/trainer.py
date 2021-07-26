@@ -120,7 +120,7 @@ class Trainer:
 
                     # Process each batch
                     dl = self.loaders[split]
-                    for batch_idx, (x, label, _) in enumerate(tqdm(dl, desc=f'{split}, {epoch}')):
+                    for batch_idx, (x, label, _, _) in enumerate(tqdm(dl, desc=f'{split}, {epoch}')):
                         # Initialize trainer args
                         args_trainer = {}
 

@@ -1,0 +1,729 @@
+import ast
+import itertools
+import os
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
+
+import matplotlib
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+import torch
+from time import time
+from torch.utils import data
+from tqdm import tqdm
+from utils.dataset import Dataset
+from utils.model import Model
+from utils.saver import Saver
+
+
+def parse():
+    """
+    Load args from file. Tries to convert them to best type.
+    """
+    try:
+        # Process input
+        hyperparams_path = Path('./')
+        if not hyperparams_path.exists():
+            raise OSError('Setup dir not found')
+        if hyperparams_path.is_dir():
+            hyperparams = os.path.join(hyperparams_path, 'detectionSetup.txt')
+        # Prepare output
+        output = {}
+        # Read file
+        with open(hyperparams) as file:
+            # Read lines
+            for l in file:
+                if l.startswith('#'):
+                    continue
+                # Remove new line
+                l = l.strip()
+                # Separate name from value
+                toks = l.split(':')
+                name = toks[0]
+                value = ':'.join(toks[1:]).strip()
+                # Parse value
+                try:
+                    value = ast.literal_eval(value)
+                except:
+                    pass
+                # Add to output
+                output[name] = value
+
+            # Verify setup integrity
+            if not all(key in output.keys() for key in ['checkpoint',
+                                                        'detection_dir',
+                                                        'data_location',
+                                                        'chunk_len',
+                                                        'chunk_only_one',
+                                                        'chunk_rate',
+                                                        'chunk_random_crop',
+                                                        'data_sampling_frequency',
+                                                        'chunk_linear_subsample',
+                                                        'chunk_butterworth_lowpass',
+                                                        'chunk_butterworth_highpass',
+                                                        'chunk_butterworth_order',
+                                                        'channels_list',
+                                                        'channels_name',
+                                                        'batch_size',
+                                                        'data_provider',
+                                                        'mean',
+                                                        'std',
+                                                        'original_labels',
+                                                        'detection_labels',
+                                                        'threshold_percentiles',
+                                                        'consecutive_outliers',
+                                                        'hysteresis',
+                                                        'voting',
+                                                        'detection_channels_voting',
+                                                        'threshold_percentile_voting',
+                                                        'consecutive_outlier_voting',
+                                                        'hysteresis_voting',
+                                                        'device']):
+                raise AttributeError("Params consistency broken!")
+    except (FileNotFoundError, AttributeError, Exception):
+        print("Restoring original params value in the setup file... please try to reconfigure setup.")
+        f = open(os.path.join(hyperparams_path, 'detectionSetup.txt'), 'w')
+        f.write("##############################################################################\n\
+# DETECTION SETUP: please don't delete or modify attributes name (before ':') #\n\
+##############################################################################\n\
+\n\
+# Checkpoints options\n\
+checkpoint: './logs/yyyy-mm-dd_hh-mm-ss_ae/'\n\
+\n\
+# Dataset options\n\
+detection_dir: './dataset/detectionSet'\n\
+data_location: './path/to/data/'\n\
+chunk_len: 512\n\
+chunk_only_one: False\n\
+chunk_rate: 1\n\
+chunk_random_crop: False\n\
+data_sampling_frequency: None\n\
+chunk_linear_subsample: 1\n\
+chunk_butterworth_lowpass: None\n\
+chunk_butterworth_highpass: None\n\
+chunk_butterworth_order: 2\n\
+channels_list: None\n\
+channels_name: None\n\
+batch_size: 128\n\
+data_provider: 'ram'\n\
+mean: None\n\
+std: None\n\
+\n\
+# Detection options\n\
+original_labels: './path/to/labels'\n\
+detection_labels: [2]\n\
+threshold_percentiles: None\n\
+consecutive_outliers: None\n\
+hysteresis: None\n\
+voting: False\n\
+detection_channels_voting: None\n\
+threshold_percentile_voting: None\n\
+consecutive_outlier_voting: None\n\
+hysteresis_voting: None\n\
+\n\
+# Model options\n\
+device: 'cuda'")
+        f.close()
+        raise AttributeError("Exit")
+
+    # Return
+    return output
+
+
+def overlap(event, alarm):
+    if alarm[1] < event[0] or alarm[0] > event[1]:
+        return False
+    else:
+        return event[0]-alarm[0]
+
+
+def remove_event_nan(ev_list, alm_list):
+    ev_list_mod = list()
+    for ev in ev_list:
+        for al in alm_list:
+            if np.isnan(al[2]):
+                if ev[0] >= al[0] and ev[1] <= al[1]:
+                    ev_list_mod.append(ev)
+    return sorted(list(set(ev_list) - set(ev_list_mod)), key=lambda tup: tup[0])
+
+
+def plot(detection_dict, plot_dir):
+    if args['voting'] is False:
+        for key in tqdm(detection_dict.keys(), desc="Plotting"):
+            ch_str, co_str, hy_str = key.split("_")
+            ch = ch_str[2:]
+            ch_name_idx = [i for i, s in enumerate(args['channels_name']) if str(ch) in s][0]
+
+            tpr = np.zeros(len(detection_dict[key]))
+            ppv = np.zeros(len(detection_dict[key]))
+
+            for i, th in enumerate(detection_dict[key].keys()):
+                tpr[i] = detection_dict[key][th]["TPR"]
+                ppv[i] = detection_dict[key][th]["PPV"]
+
+            plt.figure()
+            plt.title('TPR/PPV ' + 'CH ' + args['channels_name'][ch_name_idx] + ' ' + co_str + ' ' + hy_str)
+            plt.plot(tpr, ppv, 'b', marker="o")
+
+            plt.xlim([-0.01, 1.01])
+            plt.ylim([-0.01, 1.01])
+            plt.xlabel('Recall')
+            plt.ylabel('Precision')
+            plt.savefig(os.path.join(plot_dir, key + ".png"), dpi=300)
+            plt.close()
+    elif args['voting'] is True:
+        print("Plotting...")
+        tpr = np.zeros(len(detection_dict))
+        ppv = np.zeros(len(detection_dict))
+        f1 = np.zeros(len(detection_dict))
+        for i, key in enumerate(detection_dict.keys()):
+            tpr[i] = detection_dict[key]["TPR"]
+            ppv[i] = detection_dict[key]["PPV"]
+            f1[i] = detection_dict[key]["F1"]
+
+        ch_str, co_str, hy_str, th = key.split("_")
+
+        plt.figure()
+        plt.title('TPR/PPV ' + ' ' + co_str + ' ' + hy_str)
+        plt.plot(tpr, ppv, 'b', marker="o")
+
+        for i in range(len(detection_dict)):
+            plt.annotate("VOT" + str(i+1), (tpr[i], ppv[i]))
+
+        plt.xlim([-0.01, 1.01])
+        plt.ylim([-0.01, 1.01])
+        plt.xlabel('Recall')
+        plt.ylabel('Precision')
+        plt.savefig(os.path.join(plot_dir, "TPR_PPV_voting.png"), dpi=300)
+        plt.close()
+
+        plt.figure()
+        plt.title('F1/Vote ' + ' ' + co_str + ' ' + hy_str)
+        plt.plot(range(1, len(f1)+1), f1, 'b', marker="o")
+
+        for i in range(len(detection_dict)):
+            plt.annotate("VOT" + str(i+1), (i+1, f1[i]))
+
+        plt.ylim([-0.01, 1.01])
+        plt.xlabel('Vote')
+        plt.ylabel('F1')
+        plt.savefig(os.path.join(plot_dir, "VOT_F1_voting.png"), dpi=300)
+        plt.close()
+
+
+def interactive_plot(detection_dict):
+    matplotlib.use('tkagg')
+
+    def update_annot(ind):
+        x, y = line.get_data()
+        annot.xy = (x[ind["ind"][0]], y[ind["ind"][0]])
+        text = "Threshold {}: {}\n Precision: {}\n Recall: {}\n Time in alarm: {}%\n Advance/Delay: {} h\n TP: {} \n FP: {} \n FN: {}".format(" ".join([str(n) for n in ind["ind"]]), 
+                                                                                                                                              " ".join([str(th_list[n]) for n in ind["ind"]]), 
+                                                                                                                                              " ".join([str(round(ppv[n], 2)) for n in ind["ind"]]),
+                                                                                                                                              " ".join([str(round(tpr[n], 2)) for n in ind["ind"]]),
+                                                                                                                                              " ".join([str(time_alrm_ar[n]) for n in ind["ind"]]), 
+                                                                                                                                              " ".join([str(advance_delay_ar[n]) for n in ind["ind"]]),
+                                                                                                                                              " ".join([str(TP_list[n]) for n in ind["ind"]]),
+                                                                                                                                              " ".join([str(FP_list[n]) for n in ind["ind"]]),
+                                                                                                                                              " ".join([str(FN_list[n]) for n in ind["ind"]]))
+        annot.set_text(text)
+        annot.get_bbox_patch().set_alpha(0.4)
+
+    def hover(event):
+        vis = annot.get_visible()
+        if event.inaxes == ax:
+            cont, ind = line.contains(event)
+            if cont:
+                update_annot(ind)
+                annot.set_visible(True)
+                fig.canvas.draw_idle()
+            else:
+                if vis:
+                    annot.set_visible(False)
+                    fig.canvas.draw_idle()
+
+    ch = input("Insert Channel: ")
+    co = input("Insert Consecutive Outliers: ")
+    hy = input("Insert Hysteresis: ")
+    key = "CH"+str(ch)+"_CO"+str(co)+"_HY"+str(hy)
+
+    tpr = np.zeros(len(detection_dict[key]))
+    ppv = np.zeros(len(detection_dict[key]))
+    time_alrm_ar = np.zeros(len(detection_dict[key]))
+    advance_delay_ar = np.zeros(len(detection_dict[key]))
+    th_list = np.zeros(len(detection_dict[key]))
+    TP_list = np.zeros(len(detection_dict[key]))
+    FP_list = np.zeros(len(detection_dict[key]))
+    FN_list = np.zeros(len(detection_dict[key]))
+
+    for i, th in enumerate(detection_dict[key].keys()):
+        th_list[i] = th
+        TP_list[i] = detection_dict[key][th]["TP"]
+        FP_list[i] = detection_dict[key][th]["FP"]
+        FN_list[i] = detection_dict[key][th]["FN"]
+        tpr[i] = detection_dict[key][th]["TPR"]
+        ppv[i] = detection_dict[key][th]["PPV"]
+        time_alrm_ar[i] = round(detection_dict[key][th]["TIME_ALARM"], 3)
+        adv_del = round(detection_dict[key][th]["ADVANCE_DELAY"]) if not np.isnan(detection_dict[key][th]["ADVANCE_DELAY"]) else np.nan
+        if np.isnan(adv_del):
+            adv_del_time = np.nan
+        else:
+            if adv_del >= 0:
+                adv_del_time = timedelta(minutes=adv_del)
+            else:
+                adv_del_time = "-"+str(timedelta(minutes=abs(adv_del)))
+        advance_delay_ar[i] = adv_del_time
+
+    ch_str, co_str, hy_str = key.split("_")
+    ch = ch_str[2:]
+    ch_name_idx = [i for i, s in enumerate(args['channels_name']) if str(ch) in s][0]
+
+    fig, ax = plt.subplots()
+    plt.title('TPR/PPV ' + 'CH ' + args['channels_name'][ch_name_idx] + ' ' + co_str + ' ' + hy_str)
+    line, = plt.plot(tpr, ppv, 'b', marker="o")
+
+    annot = ax.annotate("", xy=(0, 0), xytext=(-20, 20), textcoords="offset points",
+                        bbox=dict(boxstyle="round", fc="w"),
+                        arrowprops=dict(arrowstyle="->"))
+    annot.set_visible(False)
+
+    plt.xlim([-0.01, 1.01])
+    plt.ylim([-0.01, 1.01])
+    plt.xlabel('Recall')
+    plt.ylabel('Precision')
+    fig.canvas.mpl_connect("button_press_event", hover)
+    plt.show()
+
+
+if __name__ == '__main__':
+    # Get params
+    args = parse()
+
+    # Retrieve absolute path of checkpoint
+    checkpoint = os.path.abspath(args['checkpoint'])
+
+    # Load arguments
+    hyperparams = Saver.load_hyperparams(checkpoint)
+    checkpoint_dict = Saver.load_checkpoint(checkpoint)
+
+    # Normalization
+    normalize_params = {"mean": args['mean'], "std": args['std']}
+
+    # Instantiate dataset
+    detection_dataset = Dataset(args['detection_dir'],
+                                data_location=args['data_location'],
+                                chunk_len=args['chunk_len'],
+                                chunk_only_one=args['chunk_only_one'],
+                                chunk_rate=args['chunk_rate'],
+                                chunk_random_crop=args['chunk_random_crop'],
+                                data_sampling_frequency=args['data_sampling_frequency'],
+                                chunk_linear_subsample=args['chunk_linear_subsample'],
+                                chunk_butterworth_lowpass=args['chunk_butterworth_lowpass'],
+                                chunk_butterworth_highpass=args['chunk_butterworth_highpass'],
+                                chunk_butterworth_order=args['chunk_butterworth_order'],
+                                normalize_params=normalize_params,
+                                channels_list=args['channels_list'],
+                                channels_name=args['channels_name'],
+                                provider=args['data_provider'])
+
+    # Instantiate loader
+    detection_loader = data.DataLoader(detection_dataset, batch_size=args['batch_size'], shuffle=False, num_workers=0, drop_last=True)
+
+    # Calculate sample len
+    _, _, _, times = list(map(list, zip(*detection_dataset)))
+    sample_len = int(min(i for i in [j-i for i, j in zip(times[:-1], times[1:])] if i > 0)/60)  # minutes
+
+    # Check channels_list
+    if args['channels_list'] is None:
+        raise TypeError("Channels List values must not be None")
+    else:
+        args['channels_list'].append("allmean")
+        print("Channels List =", args['channels_list'])
+
+    # Check channels_name
+    if args['channels_name'] is None:
+        args['channels_name'] = detection_dataset.get_channels_name()
+        args['channels_name'].append("allmean")
+        print("Channels Name =", args['channels_name'])
+    else:
+        args['channels_name'].append("allmean")
+        print("Channels Names =", args['channels_name'])
+
+    # Check original_labels
+    if args['original_labels'] is None:
+        raise TypeError("Original Labels values must not be None")
+    else:
+        original_labels = torch.load(os.path.abspath(args['original_labels']))
+        labels_list = original_labels['LABELS_LIST']
+        date_time_list = original_labels['DATETIME_LIST']
+
+    # Check detection_labels
+    if args['detection_labels'] is None or len(args['detection_labels']) == 0:
+        args['detection_labels'] = [2]
+        print("Detection Labels values must not be None or len = 0, considering Detection Labels =", args['detection_labels'])
+    else:
+        print("Detection Labels =", args['detection_labels'])
+
+    # Check voting
+    if args['voting'] is False:
+        print("Channel voting mechanism disabled:")
+
+        # Check threshold_perchentiles
+        if args['threshold_percentiles'] is None:
+            raise TypeError("\tThreshold Percentiles must not be None")
+        else:
+            print("\tThreshold Percentiles =", args['threshold_percentiles'])
+
+        # Check consecutive_outliers
+        if args['consecutive_outliers'] is None:
+            raise TypeError("\tConsecutive Outliers must not be None")
+        else:
+            print("\tConsecutive Outliers =", args['consecutive_outliers'])
+
+        # Check hysteresis
+        if args['hysteresis'] is None:
+            raise TypeError("\tHysteresis must not be None")
+        else:
+            print("\tHysteresis =", args['hysteresis'], "hours")
+    elif args['voting'] is True:
+        print("Channel voting mechanism enabled:")
+
+        # Check detection_channels
+        if args['detection_channels_voting'] is None:
+            args['detection_channels_voting'] = args['channels_list'][:-1]
+            print("\tDetection channels for voting must not be None, considering Detection Channels for voting =", args['detection_channels_voting'])
+        else:
+            print("Detection Channels for voting =", args['detection_channels_voting'])
+
+        # Check threshold_percentiles_voting
+        if args['threshold_percentile_voting'] is None:
+            raise TypeError("\tThreshold Percentiles for voting must not be None")
+        elif len(args['threshold_percentile_voting']) != len(args['detection_channels_voting']):
+            raise ValueError("\tThreshold Percentiles for voting must have same lenght as Channels List, (expected " + str(len(args['detection_channels_voting'])) + ", got " + str(len(args['threshold_percentile_voting'])) + ")")
+        else:
+            print("\tThreshold Percentiles for voting =", args['threshold_percentile_voting'])
+
+        # Check consecutive_outliers_voting
+        if args['consecutive_outlier_voting'] is None:
+            raise TypeError("\tConsecutive Outliers for voting must not be None")
+        else:
+            print("\tConsecutive Outliers for voting =", args['consecutive_outlier_voting'])
+
+        # Check hysteresis_voting
+        if args['hysteresis_voting'] is None:
+            raise TypeError("\tHysteresis must not be None")
+        else:
+            print("\tHysteresis for voting =", args['hysteresis_voting'], "hours")
+    else:
+        raise ValueError("Voting must be True or False")
+
+    # Setup model
+    model = Model(data_len=int(hyperparams['chunk_len'] / hyperparams['chunk_linear_subsample']),
+                  data_channels=hyperparams['data_channels'],
+                  layers_base=hyperparams['layers_base'],
+                  channels_base=hyperparams['channels_base'],
+                  min_spatial_size=hyperparams['min_spatial_size'],
+                  start_dilation=hyperparams['start_dilation'],
+                  min_sig_dil_ratio=hyperparams['min_sig_dil_ratio'],
+                  max_channels=hyperparams['max_channels'],
+                  h_size=hyperparams['h_size'],
+                  enable_variational=hyperparams['enable_variational'])
+    model.load_state_dict(checkpoint_dict['model_state_dict'])
+    model.eval()
+    model.to(args['device'])
+
+    # Model evaluation
+    out = []
+    with torch.no_grad():
+        for sig, _, _, _ in tqdm(detection_loader, desc='Inferring'):
+            rec, _, _ = model(sig.to(args['device']))
+            out.append(rec.detach().cpu())
+
+    # Group reconstructions
+    outLIN = []
+    outLABEL = []
+    outTIMESTAMP = []
+    for i, sig_batch in enumerate(tqdm(out, desc='Elaborating')):
+        for j in range(sig_batch.shape[0]):  # batch
+            tmp_sig = torch.zeros(sig_batch.shape[1:])
+            for k in range(sig_batch.shape[1]):  # channel
+                # Insert nan on reconstruction distance if signal is all 0 (station off)
+                if detection_dataset[i*args['batch_size']+j][0][k].abs().max() != 0:
+                    tmp_sig[k] = detection_dataset[i * args['batch_size']+j][0][k] - sig_batch[j, k]
+                else:
+                    tmp_sig[k] = np.nan
+            outLIN.append(tmp_sig)
+            outLABEL.append(detection_dataset[i*args['batch_size']+j][1])
+            outTIMESTAMP.append(detection_dataset[i*args['batch_size']+j][2])
+    outUNIONdiff = torch.stack(outLIN)
+    outDATETIME = [datetime.fromtimestamp(t, timezone.utc) for t in outTIMESTAMP]
+
+    # Compute reconstruction distances
+    print("Compute reconstruction distances per channel...")
+    dist = outUNIONdiff.pow(2).sum(2).sqrt()
+    # Concat mean of dists
+    dist = torch.cat([dist, dist.mean(dim=1).unsqueeze(1)], 1)
+
+    rounded_outDATETIME = []
+    for dt in outDATETIME:
+        # round to nearest sample_len minutes
+        round_to = 60 * sample_len  # seconds = 60 * sample_len minutes
+        seconds = (dt - dt.min.replace(tzinfo=timezone.utc)).seconds
+        rounding = (seconds+round_to/2) // round_to * round_to
+        rounded_dt = dt + timedelta(0, rounding-seconds, -dt.microsecond)
+        rounded_outDATETIME.append(rounded_dt)
+
+    labels = labels_list[date_time_list.index(min(rounded_outDATETIME)):date_time_list.index(max(rounded_outDATETIME))+1]
+
+    # Complete time series
+    df = pd.DataFrame(list(zip(rounded_outDATETIME, outDATETIME)), columns=['roundedDatetime', 'Datetime'])
+
+    threshold_dict = dict()
+    for i in range(dist.shape[1]):
+        df["dist_" + str(i)] = dist[:, i]
+        if args['voting'] is False:
+            threshold_dict[i] = [0] + np.nanpercentile(dist[:, i], args['threshold_percentiles']).tolist()
+
+    r = pd.date_range(start=df.roundedDatetime.min(), end=df.roundedDatetime.max(), freq=str(sample_len) + "T")
+    df = df.set_index('roundedDatetime').reindex(r).fillna(np.nan).rename_axis('roundedDatetime').reset_index()
+    df['labels'] = labels
+
+    # Extract complete reconstruction distance from df
+    complete_dist = torch.Tensor()
+    for i in range(dist.shape[1]):
+        complete_dist = torch.cat([complete_dist, torch.tensor(df['dist_' + str(i)]).unsqueeze(1)], 1)
+
+    # Create event_list, list of (start, finish, label) of each event
+    events = list(zip(df.index, df.labels))
+    ev_groups = [list(group) for key, group in itertools.groupby(events, lambda i: i[1] == args['detection_labels'][0])]
+    event_list = [(it[0][0], it[-1][0], it[0][1]) for it in ev_groups if it[0][1] == args['detection_labels'][0]]
+
+    # Create output folder
+    timestamp_str = datetime.fromtimestamp(time()).strftime('%Y-%m-%d_%H-%M-%S')
+    if args['voting'] is False: 
+        vot = "no_voting"
+    elif args['voting'] is True:
+        vot = "voting"
+    if os.path.isfile(checkpoint) or os.path.basename(os.path.normpath(checkpoint)) == "ckpt":
+        detection_output = os.path.abspath(os.path.join(os.path.join(os.path.dirname(checkpoint), os.pardir), "output/detection/" + f'{timestamp_str}_{vot}'))
+
+    Path(detection_output).mkdir(parents=True, exist_ok=True)
+
+    # Dump experiment hyper-params
+    with open(os.path.join(detection_output, 'hyperparams.txt'), mode='w') as f:
+        args_str = [f'{a}: {v}\n' for a, v in args.items()]
+        args_str.append(f'exp_name: {timestamp_str}\n')
+        f.writelines(sorted(args_str))
+
+    # Creation of alarms and detection
+    alrm_dict = dict()
+    if args['voting'] is False:
+        print("Channel voting mechanism disabled")
+
+        # Create list of combinations of channels_list, consecutive_outliers, hysteresis
+        ch_co_hy_list = list(itertools.product(range(len(args['channels_list'])), args['consecutive_outliers'], args['hysteresis']))
+
+        for ch, co, hy_hours in tqdm(ch_co_hy_list, desc="Finding Alarms"):
+            hy = int(hy_hours * (60/sample_len))
+            th_dict = dict()
+            for i, th in enumerate(threshold_dict[ch]):
+                ch_th_dist = [it >= float(th) if it == it else np.nan for it in complete_dist[:, ch].tolist()]
+
+                shifted_lists = [ch_th_dist]
+                for i in range(1, co):
+                    shifted_lists.append([0]*i + ch_th_dist[:-i])
+                nan_shifted_lists = [np.isnan(s).tolist() for s in shifted_lists]
+                shifted_lists_t = torch.tensor(shifted_lists)
+                nan_shifted_lists_t = torch.tensor(nan_shifted_lists)
+                nan_sum = nan_shifted_lists_t.sum(dim=0)
+                nan_vot = (nan_sum >= co/2).tolist()
+                all_ok = shifted_lists_t.all(dim=0).to(torch.float)
+                all_ok[nan_vot] = np.nan
+
+                alm_list = [True if it == 1 else (False if it == 0 else np.nan) for it in all_ok.tolist()]
+                groups = [list(group) for key, group in itertools.groupby(alm_list, lambda i: (i == True, i == False))]
+                hysteresis_groups = [groups[0]] + [[True if j < hy else groups[i][j] for j in range(len(groups[i]))] if ((groups[i][0] == False or np.isnan(groups[i][0])) and groups[i-1][-1] == True) else groups[i] for i in range(1, len(groups))]
+                ch_th_dist_hysteresis = [item for sublist in hysteresis_groups for item in sublist]
+                alm_groups = [list(group) for key, group in itertools.groupby(enumerate(ch_th_dist_hysteresis), lambda i: (i[1] == True, i[1] == False))]
+                start_finish_alarms = [(gt[0][0], gt[-1][0], gt[0][1]) for gt in alm_groups if (gt[0][1] == True or np.isnan(gt[0][1]))]
+                th_dict[th] = start_finish_alarms
+                #th_dict[str(th) + "alrm_list"] = ch_th_dist_hysteresis
+            alrm_dict["CH"+str(args['channels_list'][ch])+"_CO" + str(co)+"_HY"+str(hy_hours)] = th_dict
+
+        detection_dict = dict()
+        for key in tqdm(alrm_dict.keys(), desc="Detecting"):
+            th_dict = dict()
+            for th in alrm_dict[key].keys():
+                if not isinstance(th, str):
+                    dt_dict = dict()
+                    detections = list()
+                    already_detected = list()
+                    count_FP = 0
+                    count_FN = 0
+                    time_alarm = 0
+                    advance_delay = 0
+
+                    event_list_clean = remove_event_nan(event_list, alrm_dict[key][th])
+
+                    for ev in event_list_clean:
+                        for al in alrm_dict[key][th]:
+                            if al[2] == True:
+                                ov = overlap(ev, al)
+                                if ov is not False:
+                                    if ev not in (item[0] for item in detections):
+                                        detections.append((ev, al, ov))
+                                        advance_delay += ov
+                                    else:
+                                        already_detected.append(al)
+
+                    for al in alrm_dict[key][th]:
+                        if al[2] == True:
+                            time_alarm += al[1]-al[0]+1
+                            if al not in (item[1] for item in detections) and al not in already_detected:
+                                count_FP += 1
+
+                    for ev in event_list_clean:
+                        if ev not in (item[0] for item in detections):
+                            count_FN += 1
+
+                    TP = len(detections)
+                    FP = count_FP
+                    FN = count_FN
+
+                    TPR = TP/(TP+FN) if (TP+FN) != 0 else 0
+                    PPV = TP/(TP+FP) if (TP+FP) != 0 else 0
+                    FDR = FP/(TP+FP) if (TP+FP) != 0 else 0
+                    F1 = 2*((PPV*TPR)/(PPV+TPR)) if (PPV+TPR) != 0 else 0
+                    F05 = ((1+0.5**2)*PPV*TPR) / ((0.5**2) * (PPV+TPR)) if (PPV+TPR) != 0 else 0
+
+                    dt_dict["TP"] = TP
+                    dt_dict["FP"] = FP
+                    dt_dict["FN"] = FN
+                    dt_dict["TPR"] = TPR
+                    dt_dict["PPV"] = PPV
+                    dt_dict["FDR"] = FDR
+                    dt_dict["F1"] = F1
+                    dt_dict["F05"] = F05
+                    dt_dict["TIME_ALARM"] = (time_alarm/len(events))*100
+                    dt_dict["ADVANCE_DELAY"] = (advance_delay*sample_len)/len(detections) if len(detections) != 0 else np.nan
+                    dt_dict["DETECTIONS"] = detections
+                    th_dict[th] = dt_dict
+
+            detection_dict[key] = th_dict
+    elif args['voting'] is True:
+        print("Channel voting mechanism enabled")
+        
+        hy = int(args['hysteresis_voting'] * (60/sample_len))
+        
+        # if all percentiles are equal
+        if args['threshold_percentile_voting'].count(args['threshold_percentile_voting'][0]) == len(args['threshold_percentile_voting']):
+            th_str = str(args['threshold_percentile_voting'][0])
+        else:
+            th_str = "best"
+
+        vot_index = [i for i in range(len(args['channels_list'])) if args['channels_list'][i] in args['detection_channels_voting']]
+        complete_dist_vot = complete_dist[:, vot_index]
+        th_perc_list = [args['threshold_percentile_voting'][i] for i in vot_index]
+
+        ch_th_dist_voting = list()
+        for ch in tqdm(range(len(args['detection_channels_voting'])), desc="Voting"):
+            th = np.nanpercentile(complete_dist_vot[:, ch], th_perc_list[ch])
+            ch_th_dist = [it >= float(th) if it == it else np.nan for it in complete_dist_vot[:, ch].tolist()]
+            ch_th_dist_voting.append(ch_th_dist)
+        ch_th_dist_voting = np.array(ch_th_dist_voting).sum(0)
+
+        for ch in tqdm(range(1, len(args['detection_channels_voting'])+1), desc="Finding alarms"):
+            ch_th_dist_vot = [it >= ch if it == it else np.nan for it in ch_th_dist_voting]
+            shifted_lists = [ch_th_dist_vot]
+            for i in range(1, args['consecutive_outlier_voting']):
+                shifted_lists.append([0]*i + ch_th_dist_vot[:-i])
+            nan_shifted_lists = [np.isnan(s).tolist() for s in shifted_lists]
+            shifted_lists_t = torch.tensor(shifted_lists)
+            nan_shifted_lists_t = torch.tensor(nan_shifted_lists)
+            nan_sum = nan_shifted_lists_t.sum(dim=0)
+            nan_vot = (nan_sum >= args['consecutive_outlier_voting']/2).tolist()
+            all_ok = shifted_lists_t.all(dim=0).to(torch.float)
+            all_ok_prima_nan = all_ok
+            all_ok[nan_vot] = np.nan
+
+            alm_list = [True if it == 1 else (False if it == 0 else np.nan) for it in all_ok.tolist()]
+            groups = [list(group) for key, group in itertools.groupby(alm_list, lambda i: (i == True, i == False))]
+            hysteresis_groups = [groups[0]] + [[True if j < hy else groups[i][j] for j in range(len(groups[i]))] if ((groups[i][0] == False or np.isnan(groups[i][0])) and groups[i-1][-1] == True) else groups[i] for i in range(1, len(groups))]
+            ch_th_dist_hysteresis = [item for sublist in hysteresis_groups for item in sublist]
+            alm_groups = [list(group) for key, group in itertools.groupby(enumerate(ch_th_dist_hysteresis), lambda i: (i[1] == True, i[1] == False))]
+            start_finish_alarms = [(gt[0][0], gt[-1][0], gt[0][1]) for gt in alm_groups if (gt[0][1] == True or np.isnan(gt[0][1]))]
+            alrm_dict["VOT"+str(ch)+"_CO" + str(args['consecutive_outlier_voting'])+"_HY"+str(args['hysteresis_voting'])+"_THperc"+th_str] = start_finish_alarms
+
+        detection_dict = dict()
+        for key in tqdm(alrm_dict.keys(), desc="Detecting"):
+            dt_dict = dict()
+            detections = list()
+            already_detected = list()
+            count_FP = 0
+            count_FN = 0
+            time_alarm = 0
+            advance_delay = 0
+
+            event_list_clean = remove_event_nan(event_list, alrm_dict[key])
+
+            for ev in event_list_clean:
+                for al in alrm_dict[key]:
+                    if al[2] == True:
+                        ov = overlap(ev, al)
+                        if ov is not False:
+                            if ev not in (item[0] for item in detections):
+                                detections.append((ev, al, ov))
+                                advance_delay += ov
+                            else:
+                                already_detected.append(al)
+
+            for al in alrm_dict[key]:
+                if al[2] == True:
+                    time_alarm += al[1]-al[0]+1
+                    if al not in (item[1] for item in detections) and al not in already_detected:
+                        count_FP += 1
+
+            for ev in event_list_clean:
+                if ev not in (item[0] for item in detections):
+                    count_FN += 1
+
+            TP = len(detections)
+            FP = count_FP
+            FN = count_FN
+
+            TPR = TP/(TP+FN) if (TP+FN) != 0 else 0
+            PPV = TP/(TP+FP) if (TP+FP) != 0 else 0
+            FDR = FP/(TP+FP) if (TP+FP) != 0 else 0
+            F1 = 2*((PPV*TPR)/(PPV+TPR)) if (PPV+TPR) != 0 else 0
+            F05 = ((1+0.5**2)*PPV*TPR) / ((0.5**2)*(PPV+TPR)) if (PPV+TPR) != 0 else 0
+
+            dt_dict["TP"] = TP
+            dt_dict["FP"] = FP
+            dt_dict["FN"] = FN
+            dt_dict["TPR"] = TPR
+            dt_dict["PPV"] = PPV
+            dt_dict["FDR"] = FDR
+            dt_dict["F1"] = F1
+            dt_dict["F05"] = F05
+            dt_dict["TIME_ALARM"] = (time_alarm/len(events))*100
+            dt_dict["ADVANCE_DELAY"] = (advance_delay*sample_len)/len(detections) if len(detections) != 0 else np.nan
+            dt_dict["DETECTIONS"] = detections
+
+            detection_dict[key] = dt_dict
+
+    # Saving output
+    torch.save(alrm_dict, os.path.join(detection_output, "alrm_dict_" + vot + ".pt"))
+    torch.save(detection_dict, os.path.join(detection_output, "detection_dict_" + vot + ".pt"))
+
+    # Create plot dir
+    plot_dir = os.path.join(detection_output, "detectionPlot_" + vot)
+    Path(plot_dir).mkdir(parents=True, exist_ok=True)
+
+    # Plot
+    plot(detection_dict, plot_dir)
+
+    # Start interactive plot
+    if args['voting'] is False:
+        while input("Do you want an interactive plot for a specific key (channel, consecutie outliers, hysteresis)? y/n ") == "y":
+            interactive_plot(detection_dict)

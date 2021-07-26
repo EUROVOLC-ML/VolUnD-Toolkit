@@ -164,12 +164,11 @@ class FSProvider(TorchDataset):
                 print("FSProvider: cache is out of date. Reloading...")
         if reload_cache:
             # Preprocess dataset
-            print(
-                f'Preprocessing dataset list: {os.path.basename(self.data_dir)}')
+            #print(f'Preprocessing dataset list: {os.path.basename(self.data_dir)}')
             # Initialize data map
             self.data_map = []
             # Process each file
-            for i, file in enumerate(tqdm(self.files)):
+            for i, file in enumerate(tqdm(self.files, desc=f'Preprocessing dataset list: {os.path.basename(self.data_dir)}')):
                 # Load file
 
                 try:
@@ -263,7 +262,7 @@ class FSProvider(TorchDataset):
             chunk = torch.tensor(signal.sosfiltfilt(self.butterworth_sos, chunk).copy())
 
         # Return
-        return chunk, label_chunk, time_chunk
+        return chunk, label_chunk, time_chunk, timestamp[chunk_start]
 
     def get_channels_name(self):
         return self.channels_name
@@ -365,7 +364,7 @@ class RAMProvider(TorchDataset):
                 reload_cache = True
                 print("RAMProvider: cache is out of date. Reloading...")
         if reload_cache:
-            print('RAMProvider: reading all files')
+            #print('RAMProvider: reading all files')
             # Initialize data
             self.data = []
             # Create FS provider
@@ -385,11 +384,11 @@ class RAMProvider(TorchDataset):
                                      cache_dir=cache_dir,
                                      labels=labels)
             # Read all files
-            for i in tqdm(range(len(fs_provider))):
+            for i in tqdm(range(len(fs_provider)), desc='RAMProvider: reading all files'):
                 # Get data
-                data, label, timestamp = fs_provider[i]
+                data, label, timestamp, orig_timestamp = fs_provider[i]
                 # Add to data
-                self.data.append((data, label, timestamp))
+                self.data.append((data, label, timestamp, orig_timestamp))
             # Read channels info
             self.channels_name = fs_provider.get_channels_name()
             self.channels_list = fs_provider.get_channels_list()
@@ -503,7 +502,7 @@ class Dataset(TorchDataset):
 
     def __getitem__(self, idx):
         # Read data
-        data, label, timestamp = self.provider[idx]
+        data, label, timestamp, orig_timestamp = self.provider[idx]
 
         # Normalize
         data_tmp = torch.Tensor(data.shape[0], data.shape[1])
@@ -515,7 +514,7 @@ class Dataset(TorchDataset):
                 data_tmp[i] = data[i]
 
         # Return
-        return data_tmp, label, timestamp
+        return data_tmp, label, timestamp, orig_timestamp
 
     def get_channels_name(self):
         return self.channels_name

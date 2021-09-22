@@ -10,6 +10,7 @@ import numpy as np
 from tqdm import tqdm
 from torch.utils import data
 from utils.model import Model
+from utils.parser import testing_parse
 from matplotlib import pyplot as plt
 from datetime import datetime, timedelta, timezone
 from statsmodels.distributions.empirical_distribution import ECDF
@@ -22,118 +23,6 @@ matplotlib.rcParams['webagg.open_in_browser'] = False
 if sys.platform == 'win32':
     import asyncio
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
-
-
-def parse():
-    """
-    Load args from file. Tries to convert them to best type.
-    """
-    try:
-        # Process input
-        hyperparams_path = Path('./')
-        if not hyperparams_path.exists():
-            raise OSError('Setup dir not found')
-        if hyperparams_path.is_dir():
-            hyperparams = os.path.join(hyperparams_path, 'testingSetup.txt')
-        # Prepare output
-        output = {}
-        # Read file
-        with open(hyperparams) as file:
-            # Read lines
-            for l in file:
-                if l.startswith('#'):
-                    continue
-                # Remove new line
-                l = l.strip()
-                # Separate name from value
-                toks = l.split(':')
-                name = toks[0]
-                value = ':'.join(toks[1:]).strip()
-                # Parse value
-                try:
-                    value = ast.literal_eval(value)
-                except:
-                    pass
-                # Add to output
-                output[name] = value
-
-            # Verify setup integrity
-            if not all(key in output.keys() for key in ['checkpoint',
-                                                        'train_dir',
-                                                        'test_dir',
-                                                        'data_location',
-                                                        'CDF_mode',
-                                                        'chunk_len',
-                                                        'chunk_only_one',
-                                                        'chunk_rate',
-                                                        'chunk_random_crop',
-                                                        'data_sampling_frequency',
-                                                        'chunk_linear_subsample',
-                                                        'chunk_butterworth_lowpass',
-                                                        'chunk_butterworth_highpass',
-                                                        'chunk_butterworth_order',
-                                                        'channels_list',
-                                                        'channels_name',
-                                                        'batch_size',
-                                                        'data_provider',
-                                                        'mean',
-                                                        'std',
-                                                        'training_labels',
-                                                        'test_labels',
-                                                        'label_activity',
-                                                        'label_eruption',
-                                                        'device',
-                                                        'img_quality',
-                                                        'web_port']):
-                raise AttributeError("Params consistency broken!")
-    except (FileNotFoundError, AttributeError, Exception):
-        print("Restoring original params value in the setup file... please try to reconfigure setup.")
-        f = open(os.path.join(hyperparams_path, 'testingSetup.txt'), 'w')
-        f.write("##############################################################################\n\
-# TESTING SETUP: please don't delete or modify attributes name (before ':') #\n\
-##############################################################################\n\
-\n\
-# Checkpoints options\n\
-checkpoint: './logs/yyyy-mm-dd_hh-mm-ss_ae/'\n\
-\n\
-# Dataset options\n\
-train_dir: './dataset/trainingSet'\n\
-test_dir: './dataset/testSet'\n\
-data_location: './path/to/data/'\n\
-CDF_mode: False\n\
-chunk_len: 512\n\
-chunk_only_one: False\n\
-chunk_rate: 1\n\
-chunk_random_crop: False\n\
-data_sampling_frequency: None\n\
-chunk_linear_subsample: 1\n\
-chunk_butterworth_lowpass: None\n\
-chunk_butterworth_highpass: None\n\
-chunk_butterworth_order: 2\n\
-channels_list: None\n\
-channels_name: None\n\
-batch_size: 128\n\
-data_provider: 'ram'\n\
-mean: None\n\
-std: None\n\
-training_labels: [0]\n\
-test_labels: None\n\
-label_activity: [1]\n\
-label_eruption: [2]\n\
-\n\
-# Model options\n\
-device: 'cuda'\n\
-\n\
-# Image options\n\
-img_quality: 600\n\
-\n\
-# Web options\n\
-web_port: 8988")
-        f.close()
-        raise AttributeError("Exit")
-
-    # Return
-    return output
 
 
 def plotSetup(ax, x, y, channel_name, outDATETIME, label_activity, label_eruption, epoch, tipology="norm"):
@@ -244,7 +133,7 @@ def getDist(args, normalize_params, train):
 
 if __name__ == '__main__':
     # Get params
-    args = parse()
+    args = testing_parse()
 
     # Set backend port
     matplotlib.rcParams['webagg.port'] = args['web_port']

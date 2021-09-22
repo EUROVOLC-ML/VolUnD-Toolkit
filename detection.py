@@ -15,120 +15,7 @@ from tqdm import tqdm
 from utils.dataset import Dataset
 from utils.model import Model
 from utils.saver import Saver
-
-
-def parse():
-    """
-    Load args from file. Tries to convert them to best type.
-    """
-    try:
-        # Process input
-        hyperparams_path = Path('./')
-        if not hyperparams_path.exists():
-            raise OSError('Setup dir not found')
-        if hyperparams_path.is_dir():
-            hyperparams = os.path.join(hyperparams_path, 'detectionSetup.txt')
-        # Prepare output
-        output = {}
-        # Read file
-        with open(hyperparams) as file:
-            # Read lines
-            for l in file:
-                if l.startswith('#'):
-                    continue
-                # Remove new line
-                l = l.strip()
-                # Separate name from value
-                toks = l.split(':')
-                name = toks[0]
-                value = ':'.join(toks[1:]).strip()
-                # Parse value
-                try:
-                    value = ast.literal_eval(value)
-                except:
-                    pass
-                # Add to output
-                output[name] = value
-
-            # Verify setup integrity
-            if not all(key in output.keys() for key in ['checkpoint',
-                                                        'detection_dir',
-                                                        'data_location',
-                                                        'chunk_len',
-                                                        'chunk_only_one',
-                                                        'chunk_rate',
-                                                        'chunk_random_crop',
-                                                        'data_sampling_frequency',
-                                                        'chunk_linear_subsample',
-                                                        'chunk_butterworth_lowpass',
-                                                        'chunk_butterworth_highpass',
-                                                        'chunk_butterworth_order',
-                                                        'channels_list',
-                                                        'channels_name',
-                                                        'batch_size',
-                                                        'data_provider',
-                                                        'mean',
-                                                        'std',
-                                                        'original_labels',
-                                                        'detection_labels',
-                                                        'threshold_percentiles',
-                                                        'consecutive_outliers',
-                                                        'hysteresis',
-                                                        'voting',
-                                                        'detection_channels_voting',
-                                                        'threshold_percentile_voting',
-                                                        'consecutive_outlier_voting',
-                                                        'hysteresis_voting',
-                                                        'device']):
-                raise AttributeError("Params consistency broken!")
-    except (FileNotFoundError, AttributeError, Exception):
-        print("Restoring original params value in the setup file... please try to reconfigure setup.")
-        f = open(os.path.join(hyperparams_path, 'detectionSetup.txt'), 'w')
-        f.write("##############################################################################\n\
-# DETECTION SETUP: please don't delete or modify attributes name (before ':') #\n\
-##############################################################################\n\
-\n\
-# Checkpoints options\n\
-checkpoint: './logs/yyyy-mm-dd_hh-mm-ss_ae/'\n\
-\n\
-# Dataset options\n\
-detection_dir: './dataset/detectionSet'\n\
-data_location: './path/to/data/'\n\
-chunk_len: 512\n\
-chunk_only_one: False\n\
-chunk_rate: 1\n\
-chunk_random_crop: False\n\
-data_sampling_frequency: None\n\
-chunk_linear_subsample: 1\n\
-chunk_butterworth_lowpass: None\n\
-chunk_butterworth_highpass: None\n\
-chunk_butterworth_order: 2\n\
-channels_list: None\n\
-channels_name: None\n\
-batch_size: 128\n\
-data_provider: 'ram'\n\
-mean: None\n\
-std: None\n\
-\n\
-# Detection options\n\
-original_labels: './path/to/labels'\n\
-detection_labels: [2]\n\
-threshold_percentiles: None\n\
-consecutive_outliers: None\n\
-hysteresis: None\n\
-voting: False\n\
-detection_channels_voting: None\n\
-threshold_percentile_voting: None\n\
-consecutive_outlier_voting: None\n\
-hysteresis_voting: None\n\
-\n\
-# Model options\n\
-device: 'cuda'")
-        f.close()
-        raise AttributeError("Exit")
-
-    # Return
-    return output
+from utils.parser import detection_parse
 
 
 def overlap(event, alarm):
@@ -298,7 +185,7 @@ def interactive_plot(detection_dict):
 
 if __name__ == '__main__':
     # Get params
-    args = parse()
+    args = detection_parse()
 
     # Retrieve absolute path of checkpoint
     checkpoint = os.path.abspath(args['checkpoint'])

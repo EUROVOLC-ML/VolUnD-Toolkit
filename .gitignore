@@ -16,6 +16,3 @@ logs/*
 !dataset/testSet/.gitkeep
 !dataset/testSet/.gitkeep
 !logs/.gitkeep
-visualizationSetup.txt
-testingSetup.txt
-trainingSetup.txt

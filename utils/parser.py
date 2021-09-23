@@ -1,6 +1,7 @@
 import ast
 from pathlib import Path
 import os
+import torch
 
 
 def training_parse():
@@ -258,6 +259,98 @@ device: 'cuda'")
 
     # Return
     return output
+
+def check_detection_args(args, ch_names):
+    # Check channels_list
+    if args['channels_list'] is None:
+        raise TypeError("Channels List values must not be None")
+    else:
+        args['channels_list'].append("allmean")
+        print("Channels List =", args['channels_list'])
+
+    # Check channels_name
+    if args['channels_name'] is None:
+        args['channels_name'] = ch_names
+        args['channels_name'].append("allmean")
+        print("Channels Name =", args['channels_name'])
+    else:
+        args['channels_name'].append("allmean")
+        print("Channels Names =", args['channels_name'])
+
+    # Check original_labels
+    if args['original_labels'] is None:
+        raise TypeError("Original Labels values must not be None")
+    else:
+        original_labels = torch.load(os.path.abspath(args['original_labels']))
+        args['labels_list'] = original_labels['LABELS_LIST']
+        args['date_time_list'] = original_labels['DATETIME_LIST']
+
+    # Check detection_labels
+    if args['detection_labels'] is None or len(args['detection_labels']) == 0:
+        args['detection_labels'] = [2]
+        print("Detection Labels values must not be None or len = 0, considering Detection Labels =",
+              args['detection_labels'])
+    else:
+        print("Detection Labels =", args['detection_labels'])
+
+    # Check voting
+    if args['voting'] is False:
+        print("Channel voting mechanism disabled:")
+
+        # Check threshold_percentiles
+        if args['threshold_percentiles'] is None:
+            raise TypeError("\tThreshold Percentiles must not be None")
+        else:
+            print("\tThreshold Percentiles =", args['threshold_percentiles'])
+
+        # Check consecutive_outliers
+        if args['consecutive_outliers'] is None:
+            raise TypeError("\tConsecutive Outliers must not be None")
+        else:
+            print("\tConsecutive Outliers =", args['consecutive_outliers'])
+
+        # Check hysteresis
+        if args['hysteresis'] is None:
+            raise TypeError("\tHysteresis must not be None")
+        else:
+            print("\tHysteresis =", args['hysteresis'], "hours")
+    elif args['voting'] is True:
+        print("Channel voting mechanism enabled:")
+
+        # Check detection_channels
+        if args['detection_channels_voting'] is None:
+            args['detection_channels_voting'] = args['channels_list'][:-1]
+            print("\tDetection channels for voting must not be None, considering Detection Channels for voting =",
+                  args['detection_channels_voting'])
+        else:
+            print("Detection Channels for voting =", args['detection_channels_voting'])
+
+        # Check threshold_percentiles_voting
+        if args['threshold_percentile_voting'] is None:
+            raise TypeError("\tThreshold Percentiles for voting must not be None")
+        elif len(args['threshold_percentile_voting']) != len(args['detection_channels_voting']):
+            raise ValueError(
+                "\tThreshold Percentiles for voting must have same lenght as Channels List, (expected " + str(
+                    len(args['detection_channels_voting'])) + ", got " + str(
+                    len(args['threshold_percentile_voting'])) + ")")
+        else:
+            print("\tThreshold Percentiles for voting =", args['threshold_percentile_voting'])
+
+        # Check consecutive_outliers_voting
+        if args['consecutive_outlier_voting'] is None:
+            raise TypeError("\tConsecutive Outliers for voting must not be None")
+        else:
+            print("\tConsecutive Outliers for voting =", args['consecutive_outlier_voting'])
+
+        # Check hysteresis_voting
+        if args['hysteresis_voting'] is None:
+            raise TypeError("\tHysteresis must not be None")
+        else:
+            print("\tHysteresis for voting =", args['hysteresis_voting'], "hours")
+    else:
+        raise ValueError("Voting must be True or False")
+
+    return args
 
 
 def testing_parse():

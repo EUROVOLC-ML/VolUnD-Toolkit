@@ -2,20 +2,18 @@ import itertools
 import os
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from time import time
 
-import matplotlib
-import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import torch
-from time import time
+from detection_plotter import interactive_plot, plot
 from torch.utils import data
 from tqdm import tqdm
 from utils.dataset import Dataset
 from utils.model import Model
+from utils.parser import check_detection_args, detection_parse
 from utils.saver import Saver
-from utils.parser import detection_parse, check_detection_args
-from interactive_detection_plotter import interactive_plot
 
 
 def overlap(event, alarm):
@@ -33,71 +31,6 @@ def remove_event_nan(ev_list, alm_list):
                 if ev[0] >= al[0] and ev[1] <= al[1]:
                     ev_list_mod.append(ev)
     return sorted(list(set(ev_list) - set(ev_list_mod)), key=lambda tup: tup[0])
-
-
-def plot(detection_dict, plot_dir):
-    if args['voting'] is False:
-        for key in tqdm(detection_dict.keys(), desc="Plotting"):
-            ch_str, co_str, hy_str = key.split("_")
-            ch = ch_str[2:]
-            ch_name_idx = [i for i, s in enumerate(args['channels_name']) if str(ch) in s][0]
-
-            tpr = np.zeros(len(detection_dict[key]))
-            ppv = np.zeros(len(detection_dict[key]))
-
-            for i, th in enumerate(detection_dict[key].keys()):
-                tpr[i] = detection_dict[key][th]["TPR"]
-                ppv[i] = detection_dict[key][th]["PPV"]
-
-            plt.figure()
-            plt.title('TPR/PPV ' + 'CH ' + args['channels_name'][ch_name_idx] + ' ' + co_str + ' ' + hy_str)
-            plt.plot(tpr, ppv, 'b', marker="o")
-
-            plt.xlim([-0.01, 1.01])
-            plt.ylim([-0.01, 1.01])
-            plt.xlabel('Recall')
-            plt.ylabel('Precision')
-            plt.savefig(os.path.join(plot_dir, key + ".png"), dpi=300)
-            plt.close()
-    elif args['voting'] is True:
-        print("Plotting...")
-        tpr = np.zeros(len(detection_dict))
-        ppv = np.zeros(len(detection_dict))
-        f1 = np.zeros(len(detection_dict))
-        for i, key in enumerate(detection_dict.keys()):
-            tpr[i] = detection_dict[key]["TPR"]
-            ppv[i] = detection_dict[key]["PPV"]
-            f1[i] = detection_dict[key]["F1"]
-
-        ch_str, co_str, hy_str, th = key.split("_")
-
-        plt.figure()
-        plt.title('TPR/PPV ' + ' ' + co_str + ' ' + hy_str)
-        plt.plot(tpr, ppv, 'b', marker="o")
-
-        for i in range(len(detection_dict)):
-            plt.annotate("VOT" + str(i+1), (tpr[i], ppv[i]))
-
-        plt.xlim([-0.01, 1.01])
-        plt.ylim([-0.01, 1.01])
-        plt.xlabel('Recall')
-        plt.ylabel('Precision')
-        plt.savefig(os.path.join(plot_dir, "TPR_PPV_voting.png"), dpi=300)
-        plt.close()
-
-        plt.figure()
-        plt.title('F1/Vote ' + ' ' + co_str + ' ' + hy_str)
-        plt.plot(range(1, len(f1)+1), f1, 'b', marker="o")
-
-        for i in range(len(detection_dict)):
-            plt.annotate("VOT" + str(i+1), (i+1, f1[i]))
-
-        plt.ylim([-0.01, 1.01])
-        plt.xlabel('Vote')
-        plt.ylabel('F1')
-        plt.savefig(os.path.join(plot_dir, "VOT_F1_voting.png"), dpi=300)
-        plt.close()
-
 
 
 if __name__ == '__main__':
@@ -231,7 +164,6 @@ if __name__ == '__main__':
         detection_output = os.path.abspath(os.path.join(os.path.join(os.path.dirname(checkpoint), os.pardir), "output/detection/" + f'{timestamp_str}_{vot}'))
     else:
         detection_output = os.path.join(checkpoint, "output/detection/" + f'{timestamp_str}_{vot}')
-
     Path(detection_output).mkdir(parents=True, exist_ok=True)
 
     # Dump experiment hyper-params
@@ -272,7 +204,7 @@ if __name__ == '__main__':
                 alm_groups = [list(group) for key, group in itertools.groupby(enumerate(ch_th_dist_hysteresis), lambda i: (i[1] == True, i[1] == False))]
                 start_finish_alarms = [(gt[0][0], gt[-1][0], gt[0][1]) for gt in alm_groups if (gt[0][1] == True or np.isnan(gt[0][1]))]
                 th_dict[th] = start_finish_alarms
-                #th_dict[str(th) + "alrm_list"] = ch_th_dist_hysteresis
+                # th_dict[str(th) + "alrm_list"] = ch_th_dist_hysteresis
             alrm_dict["CH"+str(args['channels_list'][ch])+"_CO" + str(co)+"_HY"+str(hy_hours)] = th_dict
 
         detection_dict = dict()
@@ -292,7 +224,7 @@ if __name__ == '__main__':
 
                     for ev in event_list_clean:
                         for al in alrm_dict[key][th]:
-                            if al[2] == True:
+                            if al[2]:
                                 ov = overlap(ev, al)
                                 if ov is not False:
                                     if ev not in (item[0] for item in detections):
@@ -302,7 +234,7 @@ if __name__ == '__main__':
                                         already_detected.append(al)
 
                     for al in alrm_dict[key][th]:
-                        if al[2] == True:
+                        if al[2]:
                             time_alarm += al[1]-al[0]+1
                             if al not in (item[1] for item in detections) and al not in already_detected:
                                 count_FP += 1
@@ -369,7 +301,6 @@ if __name__ == '__main__':
                 nan_sum = nan_shifted_lists_t.sum(dim=0)
                 nan_vot = (nan_sum >= args['consecutive_outlier_voting']/2).tolist()
                 all_ok = shifted_lists_t.all(dim=0).to(torch.float)
-                all_ok_prima_nan = all_ok
                 all_ok[nan_vot] = np.nan
 
                 alm_list = [True if it == 1 else (False if it == 0 else np.nan) for it in all_ok.tolist()]
@@ -394,7 +325,7 @@ if __name__ == '__main__':
 
             for ev in event_list_clean:
                 for al in alrm_dict[key]:
-                    if al[2] == True:
+                    if al[2]:
                         ov = overlap(ev, al)
                         if ov is not False:
                             if ev not in (item[0] for item in detections):
@@ -404,7 +335,7 @@ if __name__ == '__main__':
                                 already_detected.append(al)
 
             for al in alrm_dict[key]:
-                if al[2] == True:
+                if al[2]:
                     time_alarm += al[1]-al[0]+1
                     if al not in (item[1] for item in detections) and al not in already_detected:
                         count_FP += 1
@@ -441,21 +372,9 @@ if __name__ == '__main__':
     torch.save(alrm_dict, os.path.join(detection_output, "alrm_dict_" + vot + ".pt"))
     torch.save(detection_dict, os.path.join(detection_output, "detection_dict_" + vot + ".pt"))
 
-    # Create plot dir
-    plot_dir = os.path.join(detection_output, "detectionPlot_" + vot)
-    Path(plot_dir).mkdir(parents=True, exist_ok=True)
-
     # Plot
-    plot(detection_dict, plot_dir)
+    plot(detection_dict, args['channels_name'])
 
-    # Start interactive plot
-    if args['voting'] is False:
-        while input("Do you want an interactive plot for a specific key (channel, consecutive outliers, hysteresis)? y/n ") == "y":
-            ch = input("Insert Channel: ")
-            co = input("Insert Consecutive Outliers: ")
-            hy = input("Insert Hysteresis: ")
-            key = "CH" + str(ch) + "_CO" + str(co) + "_HY" + str(hy)
-            if key in detection_dict:
-                interactive_plot(detection_dict, key, args['channels_name'])
-            else:
-                print("Key: " + key + " not in detection_dict")
+    if args.voting is False:
+        # Start interactive plot
+        interactive_plot(detection_dict, args['channels_name'])

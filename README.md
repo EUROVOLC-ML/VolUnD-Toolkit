@@ -1,6 +1,6 @@
 # VOLcano UNrest Detection (VolUnD) Toolkit
 
-![alt text](https://github.com/EUROVOLC-ML/VolUnD-Toolkit/blob/main/docs/VolUnD-logo.png?raw=true)
+[![VOLUND_LOGO](docs/images/VolUnD-logo.png)](https://github.com/EUROVOLC-ML/VolUnD-Toolkit)
 
 VolUnD is a VOLcano UNrest Detection Toolkit written in Python 3 using the PyTorch library. It performs anomaly detection of
 volcanic historical data in an unsupervised way, leveraging the hypothesis that normal activity dominates the
@@ -23,7 +23,7 @@ The root directory contains the following folders:
 - **[cache](cache)** (internal use): storage directory for internally-processed dataset.
 - **[dataset](dataset)**: directory containing default locations for train/validation/test files. Each directory can contain an arbitrary number of files, each of which must be saved in PyTorch format (using torch.save) in dictionary format, containing the following keys:
   - CHANNELS_NAME (optional): list of name for each channel,
-  - TIME_DESC (optional): natural-language description of the temporal interval of represented in the file,
+  - TIME_DESC (optional): natural-language description of the temporal interval represented in the file,
   - DATA: float tensor of size "stations × number of signals × chunk length",
   - LABEL (optional): 0 for no activity or normal activity, 1 for e.g. mild volcanic activity, 2 for e.g. energetic eruptive activity ; if not provided, non-normal events will not be emphasized during visualization,
   - TIMESTAMP: list of Unix timestamps of size “number of signals”, corresponding to the end of the signals in DATA.
@@ -163,7 +163,11 @@ To install the required modules using **pip**, you can type the following:
 >```pip3 install -r /path/to/requirements.txt```
 
 ## Usage
-Configure the Setup.txt files and then run the desired script. Example: `python training.py`
+Configure the corresponding setup.txt file and then run the desired script. Example: `python training.py`
+- [trainingSetup.txt](trainingSetup.txt) refers to [training.py](training.py)
+- [testingSetup.txt](testingSetup.txt) refers to [testing.py](testing.py)
+- [visualizationSetup.txt](visualizationSetup.txt) refers to [visualization.py](visualization.py)
+- [detectionSetup.txt](detectionSetup.txt) refers to [detection.py](detection.py)
 
 For `detection_plotter.py`, the command is: `python detection_plotter.py --det_dict_path ./path/to/detection_dict.pt [--save_plots]`
 
@@ -177,10 +181,12 @@ This project is licensed under the [EUPL, v1.2](https://joinup.ec.europa.eu/coll
 
 ## Meta
 
-[![INGV_LOGO](docs/INGV_OE-logo.png)](https://www.ct.ingv.it/)
+[![INGV_LOGO](docs/images/INGV_OE-logo.png)](https://www.ct.ingv.it/)
+
+[![PERCEIVE_LOGO](docs/images/PERCEIVE-logo.png)](http://www.perceivelab.com/index)
 
 This software was developed and made available as part of the **EUROVOLC** project. 
 
 For more information see [https://eurovolc.cp.dias.ie/index.php/Open_software](https://eurovolc.cp.dias.ie/index.php/Open_software)
 
-[![EUROVOLC_LOGO](docs/EUROVOLC-logo.jpg)](https://eurovolc.eu)
+[![EUROVOLC_LOGO](docs/images/EUROVOLC-logo.jpg)](https://eurovolc.eu)

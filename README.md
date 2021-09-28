@@ -2,12 +2,18 @@
 
 ![alt text](https://github.com/EUROVOLC-ML/VolUnD-Toolkit/blob/main/docs/VolUnD-logo.png?raw=true)
 
+VolUnD is a VOLcano UNrest Detection Toolkit written in Python 3 using the PyTorch library. It performs anomaly detection of
+volcanic historical data in an unsupervised way, leveraging the hypothesis that normal activity dominates the
+event distribution and can therefore be treated as the main source of information for training a model able to
+identify deviations as anomalies. These anomalies could be attributed to changes in the volcano state.
+
 ## Table of contents
 * [Project Structure](#project-structure)
 * [Setup](#setup)
 * [Usage](#usage)
 * [Notes](#notes)
-* [License](#license)
+* [Licensing](#licensing)
+* [Meta](#Meta)
 
 ## Project Structure
 
@@ -16,13 +22,13 @@ The toolkit is developed in Python 3 using the PyTorch library, and is structure
 The root directory contains the following folders:
 - **[cache](cache)** (internal use): storage directory for internally-processed dataset.
 - **[dataset](dataset)**: directory containing default locations for train/validation/test files. Each directory can contain an arbitrary number of files, each of which must be saved in PyTorch format (using torch.save) in dictionary format, containing the following keys:
-  - CHANNELS_NAME (optional): list of name for each channels,
+  - CHANNELS_NAME (optional): list of name for each channel,
   - TIME_DESC (optional): natural-language description of the temporal interval of represented in the file,
-  - DATA: float tensor of size “stations × number of signals × chunk length",
+  - DATA: float tensor of size "stations × number of signals × chunk length",
   - LABEL (optional): 0 for no activity or normal activity, 1 for e.g. mild volcanic activity, 2 for e.g. energetic eruptive activity ; if not provided, non-normal events will not be emphasized during visualization,
   - TIMESTAMP: list of Unix timestamps of size “number of signals”, corresponding to the end of the signals in DATA.
-- **[docs](docs)**: directory containing the IPython Notebook to export the dataset to be used as input.
-- **[fileReader](fileReader)** (for Advanced user): directory containing the function to read dataset files. Modify it if you want to use your own datatet files (without any adaptation to our format).
+- **[docs](docs)**: directory containing the IPython Notebook to export the dataset to be used as input and logos.
+- **[fileReader](fileReader)** (for Advanced user): directory containing the function to read dataset files. Modify it if you want to use your own dataset files (without any adaptation to our format).
 - **[logs](logs)**: directory where training sessions are saved.
 - **[utils](utils)** (internal use): directory containing the main source code.
 	
@@ -31,19 +37,19 @@ The main files in the toolkit are:
 - **[visualization.py](visualization.py)**: starts an instance of the backend to view past training sessions on the web dashboard sessions.
 - **[testing.py](testing.py)**: shows reconstruction distances on test data.
 - **[detection.py](detection.py)**: starts inference and detection of the alarms.
-- **[interactive_detection_plotter.py](interactive_detection_plotter.py)**: shows an interactive plot of a specific key (channel, consecutie outliers, hysteresis). Parameters: `--det_dict_path ./path/to/detection_dict.pt`
-- **[trainingSetup.txt](trainingSetup.txt)**: configures the training options. Each options is specified in a single line, using the following syntax: 
+- **[detection_plotter.py](detection_plotter.py)**: shows an interactive plot of a specific key (channel, consecutive outliers, hysteresis). Parameters: `--det_dict_path ./path/to/detection_dict.pt [--save_plots]`
+- **[trainingSetup.txt](trainingSetup.txt)**: configures the training options. Each option is specified in a single line, using the following syntax: 
 		key: value, where “key” is an option name, and “value” is the corresponding value. String values should be quoted; numeric values should not be quoted; unspecified values can be provided as “None” (unquoted); list values can be grouped between brackets.
 		Possible options are:
   - train_dir: folder (or file list in PyTorch or JSON format) where the dataset files for the training phase are located
   - val_dir: folder (or file list in PyTorch or JSON format) where the dataset files for the validation phase are located
   - data_location: folder where the dataset files are located, used only if train_dir or val_dir are file lists
-  - chunk_len: chunk length (i.e., temporal length of the a single input to the model); default 512
+  - chunk_len: chunk length (i.e., temporal length of a single input to the model); default 512
   - chunk_only_one: take one or all chunk of single signal; default False
   - chunk_rate: if chunk_only_one=False, take one chunk every chunk_rate; default 1
   - chunk_random_crop: if chunk_only_one=True, take one chunk randomly in single signal; default False
   - data_sampling_frequency: set frequency (Hz) of input signals
-  - chunk_linear_subsample: apply linear subsample to sigle signal, MUST BE A POWER OF 2 (1,2,4,8,16,32,64,128...); default 1 (not apply linear subsample)
+  - chunk_linear_subsample: apply linear subsample to single signal, MUST BE A POWER OF 2 (1,2,4,8,16,32,64,128...); default 1 (not apply linear subsample)
   - chunk_butterworth_lowpass: apply butterworth low pass filter at this frequency (Hz); default None (not apply low pass filter)
   - chunk_butterworth_highpass: apply butterworth high pass filter at this frequency (Hz); default None (not apply high pass filter)
   - chunk_butterworth_order: set order of butterworth filter; default 2
@@ -86,7 +92,7 @@ The main files in the toolkit are:
   - train_dir: as above
   - test_dir: folder where the dataset files for the testing phase are located
   - data_location: as above
-  - CDF_mode: show reconstruction distances as percentual using Probability Density Function derived from Cumulative Distribution Function of trainingSet
+  - CDF_mode: show reconstruction distances as percentage using Probability Density Function derived from Cumulative Distribution Function of trainingSet
   - chunk_len: as above
   - chunk_only_one: as above
   - chunk_rate: as above
@@ -140,14 +146,41 @@ The main files in the toolkit are:
 - **[requirements.txt](requirements.txt)**: can be used to install the modules necessary for the correct functioning of the toolkit by running the following command: “pip install -r requirements.txt”
 
 ## Setup
-Refer to [requirements.txt](requirements.txt) to install the necessary packages, is possible to use the preferred method such as pip, conda, etc.
+This software requires python3. Refer to [requirements.txt](requirements.txt) to install the necessary packages:
+- tqdm
+- numpy
+- pytorch
+- torchvision
+- tensorboard
+- matplotlib
+- scipy
+- statsmodels
+- pandas
+
+Is possible to use the preferred method such as pip, conda, etc.
+
+To install the required modules using **pip**, you can type the following:
+>```pip3 install -r /path/to/requirements.txt```
 
 ## Usage
 Configure the Setup.txt files and then run the desired script. Example: `python training.py`
-For `interactive_detection_plotter.py`, the command is: `python interactive_detection_plotter.py --det_dict_path ./path/to/detection_dict.pt`
+
+For `detection_plotter.py`, the command is: `python detection_plotter.py --det_dict_path ./path/to/detection_dict.pt [--save_plots]`
 
 ## Notes
 If you make change to dataset, remember to empty cache folder.
 
-## License
-license
+## Licensing
+Copyright (c) 2021, all persons listed in [CONTRIBUTORS.md](CONTRIBUTORS.md) in alphabetical order.
+
+This project is licensed under the [EUPL, v1.2](https://joinup.ec.europa.eu/collection/eupl/eupl-text-eupl-12). See [LICENSE](LICENSE) for more information.
+
+## Meta
+
+[![INGV_LOGO](docs/INGV_OE-logo.png)](https://www.ct.ingv.it/)
+
+This software was developed and made available as part of the **EUROVOLC** project. 
+
+For more information see [https://eurovolc.cp.dias.ie/index.php/Open_software](https://eurovolc.cp.dias.ie/index.php/Open_software)
+
+[![EUROVOLC_LOGO](docs/EUROVOLC-logo.jpg)](https://eurovolc.eu)

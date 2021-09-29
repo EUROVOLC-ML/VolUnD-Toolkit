@@ -7,6 +7,8 @@ volcanic historical data in an unsupervised way, leveraging the hypothesis that 
 event distribution and can therefore be treated as the main source of information for training a model able to
 identify deviations as anomalies. These anomalies could be attributed to changes in the volcano state.
 
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.5537254.svg)](https://doi.org/10.5281/zenodo.5537254)
+
 ## Table of contents
 * [Project Structure](#project-structure)
 * [Setup](#setup)
@@ -190,3 +192,8 @@ This software was developed and made available as part of the **EUROVOLC** proje
 For more information see [https://eurovolc.cp.dias.ie/index.php/Open_software](https://eurovolc.cp.dias.ie/index.php/Open_software)
 
 [![EUROVOLC_LOGO](docs/images/EUROVOLC-logo.jpg)](https://eurovolc.eu)
+
+## Cite this code
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.5537254.svg)](https://doi.org/10.5281/zenodo.5537254)
+
+Andrea Cannata, Flavio Cannavò, Raffaele Mineo, Simone Palazzo, Paolo Spadaro & Concetto Spampinato. (2021). EUROVOLC-ML/VolUnD-Toolkit: VolUnD 1.0 (v1.0.1). Zenodo. https://doi.org/10.5281/zenodo.5537254

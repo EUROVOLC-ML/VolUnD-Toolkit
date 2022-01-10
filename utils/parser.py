@@ -207,7 +207,7 @@ def detection_parse():
                                                         'voting',
                                                         'detection_channels_voting',
                                                         'threshold_percentile_voting',
-                                                        'consecutive_outlier_voting',
+                                                        'consecutive_outliers_voting',
                                                         'hysteresis_voting',
                                                         'device']):
                 raise AttributeError("Params consistency broken!")
@@ -249,7 +249,7 @@ hysteresis: None\n\
 voting: False\n\
 detection_channels_voting: None\n\
 threshold_percentile_voting: None\n\
-consecutive_outlier_voting: None\n\
+consecutive_outliers_voting: None\n\
 hysteresis_voting: None\n\
 \n\
 # Model options\n\

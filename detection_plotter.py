@@ -111,12 +111,13 @@ def interactive_plot(detection_dict, ch_name=None):
             print("Key: " + key + " not in detection_dict")
 
 
-def plot(detection_dict, ch_name=None):
+def plot(det_dict_path, ch_name=None):
+    detection_dict = torch.load(args.det_dict_path)
     if "VOT" in list(detection_dict.keys())[0]:
-        plot_dir = os.path.join(args.det_dict_path.parent.absolute(), "detectionPlot_voting")
+        plot_dir = Path(det_dict_path.parent.absolute()) / Path("detectionPlot_voting")
         vote = True
     else:
-        plot_dir = os.path.join(args.det_dict_path.parent.absolute(), "detectionPlot_no_voting")
+        plot_dir = Path(det_dict_path.parent.absolute()) / Path("detectionPlot_no_voting")
         vote = False
     Path(plot_dir).mkdir(parents=True, exist_ok=True)
 
@@ -187,7 +188,7 @@ if __name__ == '__main__':
     detection_dict = torch.load(args.det_dict_path)
 
     if args.save_plots is True:
-        plot(detection_dict)
+        plot(args.det_dict_path)
 
     if "VOT" in list(detection_dict.keys())[0]:
         print("Interactive plotter works only without voting mechanism")

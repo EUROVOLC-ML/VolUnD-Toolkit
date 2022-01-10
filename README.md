@@ -143,8 +143,8 @@ The main files in the toolkit are:
   - hysteresis: list of hysteresis to extend an alarm in hours
   - voting: choose whether channels must vote to consider an alarm (True) or if alarms must be considered separated for each channel (False); default False
   - threshold_percentile_voting: list of percentiles, one for each channel, for which to calculate the thresholds that must be exceeded by reconstruction distance
-  - consecutive_outlier_voting: value of consecutive outlier to consider an alarm
-  - hysteresis_voting: value of hysteresis to extend an alarm in hours
+  - consecutive_outliers_voting: list of consecutive outliers to consider an alarm
+  - hysteresis_voting: list of hysteresis to extend an alarm in hours
 - **[requirements.txt](requirements.txt)**: can be used to install the modules necessary for the correct functioning of the toolkit by running the following command: “pip install -r requirements.txt”
 
 ## Setup

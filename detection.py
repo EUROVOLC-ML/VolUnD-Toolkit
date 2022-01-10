@@ -269,47 +269,42 @@ if __name__ == '__main__':
             detection_dict[key] = th_dict
     elif args['voting'] is True:
         print("Channel voting mechanism enabled")
-        co_hy_list = list(itertools.product(range(len(args['channels_list'])), args['consecutive_outliers'], args['hysteresis']))
-        for hy_hour in args['hysteresis_voting']:
+        ch_co_hy_list = list(itertools.product(range(1, len(args['detection_channels_voting'])+1), args['consecutive_outlier_voting'], args['hysteresis_voting']))
+
+        # If all percentiles are equal
+        th_str = str(args['consecutive_outlier_voting'][0]) if args['consecutive_outlier_voting'].count(args['consecutive_outlier_voting'][0]) == len(args['consecutive_outlier_voting']) else "best"
+
+        vot_index = [i for i in range(len(args['channels_list'])) if args['channels_list'][i] in args['detection_channels_voting']]
+        complete_dist_vot = complete_dist[:, vot_index]
+        th_perc_list = [args['threshold_percentile_voting'][i] for i in vot_index]
+        ch_th_dist_voting = list()
+        for ch in tqdm(range(len(args['detection_channels_voting'])), desc="Voting"):
+            th = np.nanpercentile(complete_dist_vot[:, ch], th_perc_list[ch])
+            ch_th_dist = [it >= float(th) if it == it else np.nan for it in complete_dist_vot[:, ch].tolist()]
+            ch_th_dist_voting.append(ch_th_dist)
+        ch_th_dist_voting = np.array(ch_th_dist_voting).sum(0)
+
+        for ch, co, hy_hour in tqdm(ch_co_hy_list, desc="Finding alarms"):
             hy = int(hy_hour * (60/sample_len))
-            
-            # if all percentiles are equal
-            if args['threshold_percentile_voting'].count(args['threshold_percentile_voting'][0]) == len(args['threshold_percentile_voting']):
-                th_str = str(args['threshold_percentile_voting'][0])
-            else:
-                th_str = "best"
+            ch_th_dist_vot = [it >= ch if it == it else np.nan for it in ch_th_dist_voting]
+            shifted_lists = [ch_th_dist_vot]
+            for i in range(1, co):
+                shifted_lists.append([0]*i + ch_th_dist_vot[:-i])
+            nan_shifted_lists = [np.isnan(s).tolist() for s in shifted_lists]
+            shifted_lists_t = torch.tensor(shifted_lists)
+            nan_shifted_lists_t = torch.tensor(nan_shifted_lists)
+            nan_sum = nan_shifted_lists_t.sum(dim=0)
+            nan_vot = (nan_sum >= co/2).tolist()
+            all_ok = shifted_lists_t.all(dim=0).to(torch.float)
+            all_ok[nan_vot] = np.nan
 
-            vot_index = [i for i in range(len(args['channels_list'])) if args['channels_list'][i] in args['detection_channels_voting']]
-            complete_dist_vot = complete_dist[:, vot_index]
-            th_perc_list = [args['threshold_percentile_voting'][i] for i in vot_index]
-            print(th_perc_list)
-            ch_th_dist_voting = list()
-            for ch in tqdm(range(len(args['detection_channels_voting'])), desc="Voting"):
-                th = np.nanpercentile(complete_dist_vot[:, ch], th_perc_list[ch])
-                ch_th_dist = [it >= float(th) if it == it else np.nan for it in complete_dist_vot[:, ch].tolist()]
-                ch_th_dist_voting.append(ch_th_dist)
-            ch_th_dist_voting = np.array(ch_th_dist_voting).sum(0)
-
-            for ch in tqdm(range(1, len(args['detection_channels_voting'])+1), desc="Finding alarms"):
-                ch_th_dist_vot = [it >= ch if it == it else np.nan for it in ch_th_dist_voting]
-                shifted_lists = [ch_th_dist_vot]
-                for i in range(1, args['consecutive_outlier_voting']):
-                    shifted_lists.append([0]*i + ch_th_dist_vot[:-i])
-                nan_shifted_lists = [np.isnan(s).tolist() for s in shifted_lists]
-                shifted_lists_t = torch.tensor(shifted_lists)
-                nan_shifted_lists_t = torch.tensor(nan_shifted_lists)
-                nan_sum = nan_shifted_lists_t.sum(dim=0)
-                nan_vot = (nan_sum >= args['consecutive_outlier_voting']/2).tolist()
-                all_ok = shifted_lists_t.all(dim=0).to(torch.float)
-                all_ok[nan_vot] = np.nan
-
-                alm_list = [True if it == 1 else (False if it == 0 else np.nan) for it in all_ok.tolist()]
-                groups = [list(group) for key, group in itertools.groupby(alm_list, lambda i: (i == True, i == False))]
-                hysteresis_groups = [groups[0]] + [[True if j < hy else groups[i][j] for j in range(len(groups[i]))] if ((groups[i][0] == False or np.isnan(groups[i][0])) and groups[i-1][-1] == True) else groups[i] for i in range(1, len(groups))]
-                ch_th_dist_hysteresis = [item for sublist in hysteresis_groups for item in sublist]
-                alm_groups = [list(group) for key, group in itertools.groupby(enumerate(ch_th_dist_hysteresis), lambda i: (i[1] == True, i[1] == False))]
-                start_finish_alarms = [(gt[0][0], gt[-1][0], gt[0][1]) for gt in alm_groups if (gt[0][1] == True or np.isnan(gt[0][1]))]
-                alrm_dict["VOT"+str(ch)+"_CO" + str(args['consecutive_outlier_voting'])+"_HY"+str(hy)+"_THperc"+th_str] = start_finish_alarms
+            alm_list = [True if it == 1 else (False if it == 0 else np.nan) for it in all_ok.tolist()]
+            groups = [list(group) for key, group in itertools.groupby(alm_list, lambda i: (i == True, i == False))]
+            hysteresis_groups = [groups[0]] + [[True if j < hy else groups[i][j] for j in range(len(groups[i]))] if ((groups[i][0] == False or np.isnan(groups[i][0])) and groups[i-1][-1] == True) else groups[i] for i in range(1, len(groups))]
+            ch_th_dist_hysteresis = [item for sublist in hysteresis_groups for item in sublist]
+            alm_groups = [list(group) for key, group in itertools.groupby(enumerate(ch_th_dist_hysteresis), lambda i: (i[1] == True, i[1] == False))]
+            start_finish_alarms = [(gt[0][0], gt[-1][0], gt[0][1]) for gt in alm_groups if (gt[0][1] == True or np.isnan(gt[0][1]))]
+            alrm_dict["VOT"+str(ch)+"_CO" + str(co)+"_HY"+str(hy)+"_THperc"+th_str] = start_finish_alarms
 
         detection_dict = dict()
         for key in tqdm(alrm_dict.keys(), desc="Detecting"):
@@ -370,11 +365,12 @@ if __name__ == '__main__':
 
     # Saving output
     torch.save(alrm_dict, os.path.join(detection_output, "alrm_dict_" + vot + ".pt"))
-    torch.save(detection_dict, os.path.join(detection_output, "detection_dict_" + vot + ".pt"))
+    det_dict_path = os.path.join(detection_output, "detection_dict_" + vot + ".pt")
+    torch.save(detection_dict, det_dict_path)
 
     # Plot
-    plot(detection_dict, args['channels_name'])
+    plot(det_dict_path, args['channels_name'])
 
-    if args.voting is False:
+    if args['voting'] is False:
         # Start interactive plot
         interactive_plot(detection_dict, args['channels_name'])

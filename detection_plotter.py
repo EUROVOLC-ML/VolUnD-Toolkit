@@ -112,12 +112,12 @@ def interactive_plot(detection_dict, ch_name=None):
 
 
 def plot(det_dict_path, ch_name=None):
-    detection_dict = torch.load(args.det_dict_path)
+    detection_dict = torch.load(det_dict_path)
     if "VOT" in list(detection_dict.keys())[0]:
-        plot_dir = Path(det_dict_path.parent.absolute()) / Path("detectionPlot_voting")
+        plot_dir = Path(det_dict_path).parent.absolute() / Path("detectionPlot_voting")
         vote = True
     else:
-        plot_dir = Path(det_dict_path.parent.absolute()) / Path("detectionPlot_no_voting")
+        plot_dir = Path(det_dict_path).parent.absolute() / Path("detectionPlot_no_voting")
         vote = False
     Path(plot_dir).mkdir(parents=True, exist_ok=True)
 

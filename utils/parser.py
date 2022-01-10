@@ -337,10 +337,10 @@ def check_detection_args(args, ch_names):
             print("\tThreshold Percentiles for voting =", args['threshold_percentile_voting'])
 
         # Check consecutive_outliers_voting
-        if args['consecutive_outlier_voting'] is None:
+        if args['consecutive_outliers_voting'] is None:
             raise TypeError("\tConsecutive Outliers for voting must not be None")
         else:
-            print("\tConsecutive Outliers for voting =", args['consecutive_outlier_voting'])
+            print("\tConsecutive Outliers for voting =", args['consecutive_outliers_voting'])
 
         # Check hysteresis_voting
         if args['hysteresis_voting'] is None:

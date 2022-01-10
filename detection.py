@@ -269,10 +269,10 @@ if __name__ == '__main__':
             detection_dict[key] = th_dict
     elif args['voting'] is True:
         print("Channel voting mechanism enabled")
-        ch_co_hy_list = list(itertools.product(range(1, len(args['detection_channels_voting'])+1), args['consecutive_outlier_voting'], args['hysteresis_voting']))
+        ch_co_hy_list = list(itertools.product(range(1, len(args['detection_channels_voting'])+1), args['consecutive_outliers_voting'], args['hysteresis_voting']))
 
         # If all percentiles are equal
-        th_str = str(args['consecutive_outlier_voting'][0]) if args['consecutive_outlier_voting'].count(args['consecutive_outlier_voting'][0]) == len(args['consecutive_outlier_voting']) else "best"
+        th_str = str(args['consecutive_outliers_voting'][0]) if args['consecutive_outliers_voting'].count(args['consecutive_outliers_voting'][0]) == len(args['consecutive_outliers_voting']) else "best"
 
         vot_index = [i for i in range(len(args['channels_list'])) if args['channels_list'][i] in args['detection_channels_voting']]
         complete_dist_vot = complete_dist[:, vot_index]

@@ -282,8 +282,8 @@ def check_detection_args(args, ch_names):
         raise TypeError("Original Labels values must not be None")
     else:
         original_labels = torch.load(os.path.abspath(args['original_labels']))
-        args['labels_list'] = original_labels['LABELS_LIST']
-        args['date_time_list'] = original_labels['DATETIME_LIST']
+        labels_list = original_labels['LABELS_LIST']
+        date_time_list = original_labels['DATETIME_LIST']
 
     # Check detection_labels
     if args['detection_labels'] is None or len(args['detection_labels']) == 0:
@@ -350,7 +350,7 @@ def check_detection_args(args, ch_names):
     else:
         raise ValueError("Voting must be True or False")
 
-    return args
+    return args, labels_list, date_time_list
 
 
 def testing_parse():

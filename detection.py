@@ -71,7 +71,7 @@ if __name__ == '__main__':
     _, _, _, times = list(map(list, zip(*detection_dataset)))
     sample_len = int(min(i for i in [j-i for i, j in zip(times[:-1], times[1:])] if i > 0)/60)  # minutes
 
-    args = check_detection_args(args, detection_dataset.get_channels_name())
+    args, labels_list, date_time_list = check_detection_args(args, detection_dataset.get_channels_name())
 
     # Setup model
     model = Model(data_len=int(hyperparams['chunk_len'] / hyperparams['chunk_linear_subsample']),
@@ -129,7 +129,7 @@ if __name__ == '__main__':
         rounded_dt = dt + timedelta(0, rounding-seconds, -dt.microsecond)
         rounded_outDATETIME.append(rounded_dt)
 
-    labels = args['labels_list'][args['date_time_list'].index(min(rounded_outDATETIME)):args['date_time_list'].index(max(rounded_outDATETIME))+1]
+    labels = labels_list[date_time_list.index(min(rounded_outDATETIME)):date_time_list.index(max(rounded_outDATETIME))+1]
 
     # Complete time series
     df = pd.DataFrame(list(zip(rounded_outDATETIME, outDATETIME)), columns=['roundedDatetime', 'Datetime'])
@@ -183,12 +183,12 @@ if __name__ == '__main__':
         for ch, co, hy_hours in tqdm(ch_co_hy_list, desc="Finding Alarms"):
             hy = int(hy_hours * (60/sample_len))
             th_dict = dict()
-            for i, th in enumerate(threshold_dict[ch]):
+            for t, th in enumerate(threshold_dict[ch]):
                 ch_th_dist = [it >= float(th) if it == it else np.nan for it in complete_dist[:, ch].tolist()]
 
                 shifted_lists = [ch_th_dist]
-                for i in range(1, co):
-                    shifted_lists.append([0]*i + ch_th_dist[:-i])
+                for c in range(1, co):
+                    shifted_lists.append([0]*c + ch_th_dist[:-c])
                 nan_shifted_lists = [np.isnan(s).tolist() for s in shifted_lists]
                 shifted_lists_t = torch.tensor(shifted_lists)
                 nan_shifted_lists_t = torch.tensor(nan_shifted_lists)
@@ -210,7 +210,7 @@ if __name__ == '__main__':
         detection_dict = dict()
         for key in tqdm(alrm_dict.keys(), desc="Detecting"):
             th_dict = dict()
-            for th in alrm_dict[key].keys():
+            for t, th in enumerate(alrm_dict[key].keys()):
                 if not isinstance(th, str):
                     dt_dict = dict()
                     detections = list()
@@ -264,7 +264,7 @@ if __name__ == '__main__':
                     dt_dict["TIME_ALARM"] = (time_alarm/len(events))*100
                     dt_dict["ADVANCE_DELAY"] = (advance_delay*sample_len)/len(detections) if len(detections) != 0 else np.nan
                     dt_dict["DETECTIONS"] = detections
-                    th_dict[th] = dt_dict
+                    th_dict[args['threshold_percentiles'][t]] = dt_dict
 
             detection_dict[key] = th_dict
     elif args['voting'] is True:

@@ -138,6 +138,7 @@ if __name__ == '__main__':
     for i in range(dist.shape[1]):
         df["dist_" + str(i)] = dist[:, i]
         if args['voting'] is False:
+            #threshold_dict[i] = [0] + np.nanpercentile(dist[:, i], args['threshold_percentiles']).tolist()
             threshold_dict[i] = np.nanpercentile(dist[:, i], args['threshold_percentiles']).tolist()
 
     r = pd.date_range(start=df.roundedDatetime.min(), end=df.roundedDatetime.max(), freq=str(sample_len) + "T")

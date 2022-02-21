@@ -138,8 +138,7 @@ if __name__ == '__main__':
     for i in range(dist.shape[1]):
         df["dist_" + str(i)] = dist[:, i]
         if args['voting'] is False:
-            #threshold_dict[i] = [0] + np.nanpercentile(dist[:, i], args['threshold_percentiles']).tolist()
-            threshold_dict[i] = np.nanpercentile(dist[:, i], args['threshold_percentiles']).tolist()
+            threshold_dict[i] = [0] + np.nanpercentile(dist[:, i], args['threshold_percentiles']).tolist()
 
     r = pd.date_range(start=df.roundedDatetime.min(), end=df.roundedDatetime.max(), freq=str(sample_len) + "T")
     df = df.set_index('roundedDatetime').reindex(r).fillna(np.nan).rename_axis('roundedDatetime').reset_index()
@@ -265,7 +264,7 @@ if __name__ == '__main__':
                     dt_dict["TIME_ALARM"] = (time_alarm/len(events))*100
                     dt_dict["ADVANCE_DELAY"] = (advance_delay*sample_len)/len(detections) if len(detections) != 0 else np.nan
                     dt_dict["DETECTIONS"] = detections
-                    th_dict[str(args['threshold_percentiles'][t])] = dt_dict
+                    th_dict[str(([0] + args['threshold_percentiles'])[t])] = dt_dict
 
             detection_dict[key] = th_dict
     elif args['voting'] is True:

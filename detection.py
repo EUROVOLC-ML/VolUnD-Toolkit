@@ -7,10 +7,11 @@ from time import time
 import numpy as np
 import pandas as pd
 import torch
-from detection_plotter import interactive_plot, plot
 from torch.utils import data
 from tqdm import tqdm
+from utils.check_predictions import check_predictions
 from utils.dataset import Dataset
+from utils.detection_plotter import interactive_plot, plot
 from utils.model import Model
 from utils.parser import check_detection_args, detection_parse
 from utils.saver import Saver
@@ -156,10 +157,7 @@ if __name__ == '__main__':
 
     # Create output folder
     timestamp_str = datetime.fromtimestamp(time()).strftime('%Y-%m-%d_%H-%M-%S')
-    if args['voting'] is False: 
-        vot = "no_voting"
-    elif args['voting'] is True:
-        vot = "voting"
+    vot = "voting" if args['voting'] else "no_voting"
     if os.path.isfile(checkpoint) or os.path.basename(os.path.normpath(checkpoint)) == "ckpt":
         detection_output = os.path.abspath(os.path.join(os.path.join(os.path.dirname(checkpoint), os.pardir), "output/detection/" + f'{timestamp_str}_{vot}'))
     else:
@@ -367,6 +365,9 @@ if __name__ == '__main__':
     torch.save(alrm_dict, os.path.join(detection_output, "alrm_dict_" + vot + ".pt"))
     det_dict_path = os.path.join(detection_output, "detection_dict_" + vot + ".pt")
     torch.save(detection_dict, det_dict_path)
+
+    # Check Prediction
+    check_predictions(detection_dict, detection_output, "detection_" + vot + ".xlsx")
 
     # Plot
     plot(det_dict_path, args['channels_name'])

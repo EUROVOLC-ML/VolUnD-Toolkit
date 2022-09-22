@@ -196,4 +196,4 @@ For more information see [EuroVolk Wiki - Open software](https://eurovolc.cp.dia
 ## Cite this code
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.5537253.svg)](https://doi.org/10.5281/zenodo.5537253)
 
-Andrea Cannata, Flavio Cannavò, Raffaele Mineo, Simone Palazzo, Paolo Spadaro & Concetto Spampinato. (2021). EUROVOLC-ML/VolUnD-Toolkit. Zenodo. https://doi.org/10.5281/zenodo.5537253
+Raffaele Mineo, Paolo Spadaro, Flavio Cannavò, Simone Palazzo, Andrea Cannata, & Concetto Spampinato. (2021). EUROVOLC-ML/VolUnD-Toolkit. Zenodo. https://doi.org/10.5281/zenodo.5537253

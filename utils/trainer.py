@@ -120,7 +120,7 @@ class Trainer:
 
                     # Process each batch
                     dl = self.loaders[split]
-                    for batch_idx, (x, label, _, _) in enumerate(tqdm(dl, desc=f'{split}, {epoch}')):
+                    for batch_idx, (x, label, timestamp, orig_timestamp) in enumerate(tqdm(dl, desc=f'{split}, {epoch}')):
                         # Initialize trainer args
                         args_trainer = {}
 
@@ -134,7 +134,7 @@ class Trainer:
                         args_trainer['step'] = (epoch * len(dl)) + batch_idx
                         args_trainer['split'] = split
                         out, metrics = self.__forward_batch(
-                            x, label, args_trainer)
+                            x, label, args_trainer, timestamp, orig_timestamp)
 
                         # Check NaN
                         if torch.isnan(out[0]).all():
@@ -159,6 +159,17 @@ class Trainer:
                                 self.saver.dump_metric(
                                     v, args_trainer['step'], split, k, 'batch')
 
+                    # Log epoch metrics
+                    for k, v in epoch_metrics.items():
+                        if k not in ['tp', 'fp', 'tn', 'fn']:
+                            # Compute epoch average
+                            avg_v = sum(v)/len(v)
+                            # Dump to saver
+                            self.saver.dump_metric(
+                                avg_v, epoch, split, k, 'epoch')
+                            # Add to output results
+                            result_metrics[split][k] = result_metrics[split][k] + \
+                                [avg_v] if k in result_metrics[split] else [avg_v]
                     # End epoch, training: estimate thresholds from reconstruction distance
                     self.__end_epoch()
                     if split == self.splits[0]:  # Training Set
@@ -170,17 +181,6 @@ class Trainer:
                         dist_thresholds = torch.linspace(
                             0, 2*max_rec_dist, 64).unsqueeze(0).to(self.args['device'])
                         # dist_thresholds = torch.linspace(min_rec_dist, max_rec_dist + 2*(max_rec_dist - min_rec_dist), 20).unsqueeze(0).to(self.args['device'])
-
-                        # Log epoch metrics
-                        for k, v in epoch_metrics.items():
-                            # Compute epoch average
-                            avg_v = sum(v)/len(v)
-                            # Dump to saver
-                            self.saver.dump_metric(
-                                avg_v, epoch, split, k, 'epoch')
-                            # Add to output results
-                            result_metrics[split][k] = result_metrics[split][k] + \
-                                [avg_v] if k in result_metrics[split] else [avg_v]
 
                     # End epoch, val: compute TPR and FPR
                     # Validation Set
@@ -225,7 +225,7 @@ class Trainer:
         # Return
         return self.net, result_metrics
 
-    def __forward_batch(self, x, label, args):
+    def __forward_batch(self, x, label, args, timestamp, orig_timestamp):
         # Set network mode
         if args['split'] == self.splits[0]:  # Training Set
             self.net.train()
@@ -271,17 +271,17 @@ class Trainer:
             # Compute predictions at different thresholds
             preds = (rec_dist > dist_thresholds).type(label.type())
             # Expand label for broadcast
-            label = label.unsqueeze(1).expand_as(preds)
+            label_exp = label.unsqueeze(1).expand_as(preds)
             # Compute TP, FP, TN, FN for each threshold
-            metrics['tp'] = (preds*label).sum(0)
-            metrics['fp'] = (preds*(1-label)).sum(0)
-            metrics['tn'] = ((1-preds)*(1-label)).sum(0)
-            metrics['fn'] = ((1-preds)*label).sum(0)
+            metrics['tp'] = (preds*label_exp).sum(0)
+            metrics['fp'] = (preds*(1-label_exp)).sum(0)
+            metrics['tn'] = ((1-preds)*(1-label_exp)).sum(0)
+            metrics['fn'] = ((1-preds)*label_exp).sum(0)
 
         # Plot
         if args['step'] % self.plot_every == 0:
             # Execute dump_line in different thread
-            Thread(target=self.print_line, args=(self.ch_list, self.args['datasets'], args['step'], args['split'], x, x_rec, )).start()
+            Thread(target=self.print_line, args=(self.ch_list, self.args['datasets'], args['step'], args['split'], x, x_rec, label, timestamp, orig_timestamp, )).start()
 
         # Return metrics
         return (x_rec, mu, logvar), metrics
@@ -303,11 +303,11 @@ class Trainer:
             self.saver.dump_histogram(param.grad, args_step, 'grad ' + name)
             self.saver.dump_histogram(param.data, args_step, 'param ' + name)
 
-    def print_line(self, ch_list, args_datasets, args_step, args_split, x, x_rec):
+    def print_line(self, ch_list, args_datasets, args_step, args_split, x, x_rec, label, timestamp, orig_timestamp):
         # Log output signal reconstruction
         for index in range(len(self.ch_list)):
             # Get channel name
             channel_name = args_datasets[list(args_datasets.keys())[0]].get_channels_name()[index]
             # Log signal
-            self.saver.dump_line(x[0, index, :], args_step, args_split, 'CH_'+str(channel_name))
-            self.saver.dump_line(x_rec[0, index, :], args_step, args_split, 'CH_'+str(channel_name)+'_reconstruction')
+            self.saver.dump_line(x[0, index, :], args_step, args_split, 'CH_'+str(channel_name), label[0], timestamp[0], orig_timestamp[0])
+            self.saver.dump_line(x_rec[0, index, :], args_step, args_split, 'CH_'+str(channel_name)+'_reconstruction', label[0], timestamp[0], orig_timestamp[0])

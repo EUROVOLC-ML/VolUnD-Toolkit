@@ -29,11 +29,12 @@ class FSProvider(TorchDataset):
     Data provider from file system
     """
 
-    def __init__(self, data_dir, data_location, chunk_len, chunk_only_one=False, chunk_rate=1, chunk_random_crop=False, data_sampling_frequency=None, chunk_linear_subsample=1, chunk_butterworth_lowpass=None, chunk_butterworth_highpass=None, chunk_butterworth_order=2, channels_list=None, channels_name=None, cache_dir='./cache', labels=None):
+    def __init__(self, data_dir, data_location, data_key, chunk_len, chunk_only_one=False, chunk_rate=1, chunk_random_crop=False, data_sampling_frequency=None, chunk_linear_subsample=1, chunk_butterworth_lowpass=None, chunk_butterworth_highpass=None, chunk_butterworth_order=2, channels_list=None, channels_name=None, cache_dir='./cache', labels=None):
         """
         Args:
         - data_dir (string): path to directory containing files
         - data_location (string): path to directory containing files (if data_dir is a file list)
+        - data_key (string): key used if data_dir is a dict.
         - chunk_len (int): length of each item returned by the dataset
         - chunk_only_one (boolean): take one or all chunk of single signal
         - chunk_rate (int): if chunk_only_one=False, take one chunk every chunk_rate
@@ -51,6 +52,7 @@ class FSProvider(TorchDataset):
 
         # Store args
         self.data_location = os.path.abspath(data_location)
+        self.data_key = data_key
         self.data_dir = os.path.abspath(data_dir)
         self.chunk_len = chunk_len
         self.chunk_only_one = chunk_only_one
@@ -81,7 +83,8 @@ class FSProvider(TorchDataset):
         if os.path.isfile(self.data_dir):
             file_list = []
             if self.data_dir.lower().endswith('.pt'):
-                file_list = torch.load(self.data_dir)[os.path.basename(self.data_dir)[:-3]]
+                k = data_key if data_key is not None else os.path.basename(data_dir)[:-3]
+                file_list = torch.load(self.data_dir)[k]
             elif self.data_dir.lower().endswith('.txt'):
                 with open(self.data_dir) as infile:
                     for line in infile:
@@ -134,8 +137,8 @@ class FSProvider(TorchDataset):
             raise AttributeError("channels_name must have same length of signal channels!")
 
         # Get dataset name for cache
-        cache_name = os.path.basename(self.data_dir).replace(
-            '/', '_').replace('\\', '_').replace('.', '_')
+        cache_name = os.path.basename(self.data_dir).replace('/', '_').replace('\\', '_').replace('.', '_')
+        cache_name += f'_{data_key}' if data_key is not None else ""
         cache_name += f'_fs_{chunk_len}_{chunk_only_one}_{chunk_rate}_{chunk_random_crop}_{chunk_linear_subsample}'
         cache_name += f'_label_{"all" if  labels is None else "".join(str(l) for l in labels).replace(" ", "_")}'
         cache_name += f'_ch_{"all" if  channels_list is None else "".join(str(c) for c in channels_list).replace(" ", "_")}'
@@ -144,6 +147,7 @@ class FSProvider(TorchDataset):
         # Create setup map
         setup_map = {'files': self.files,
                      'data_dir': os.path.basename(self.data_dir),
+                     'data_key': data_key,
                      'labels': self.labels,
                      'channels_list': self.channels_list,
                      'chunk_len': self.chunk_len,
@@ -276,11 +280,12 @@ class RAMProvider(TorchDataset):
     Data provider from RAM
     """
 
-    def __init__(self, data_dir, data_location, chunk_len, chunk_only_one=False, chunk_rate=1, chunk_random_crop=False, data_sampling_frequency=None, chunk_linear_subsample=1, chunk_butterworth_lowpass=None, chunk_butterworth_highpass=None, chunk_butterworth_order=2, channels_list=None, channels_name=None, cache_dir='./cache', labels=None):
+    def __init__(self, data_dir, data_location, data_key, chunk_len, chunk_only_one=False, chunk_rate=1, chunk_random_crop=False, data_sampling_frequency=None, chunk_linear_subsample=1, chunk_butterworth_lowpass=None, chunk_butterworth_highpass=None, chunk_butterworth_order=2, channels_list=None, channels_name=None, cache_dir='./cache', labels=None):
         """
         Args:
         - data_dir (string): path to directory containing files
         - data_location (string): path to directory containing files (if data_dir is a file list)
+        - data_key (string): key used if data_dir is a dict.
         - chunk_len (int): length of each item returned by the dataset
         - chunk_only_one (boolean): take one or all chunk of single signal
         - chunk_rate (int): if chunk_only_one=False, take one chunk every chunk_rate
@@ -303,7 +308,8 @@ class RAMProvider(TorchDataset):
         if os.path.isfile(data_dir):
             file_list = []
             if data_dir.lower().endswith('.pt'):
-                file_list = torch.load(data_dir)[os.path.basename(data_dir)[:-3]]
+                k = data_key if data_key is not None else os.path.basename(data_dir)[:-3]
+                file_list = torch.load(data_dir)[k]
             elif data_dir.lower().endswith('.txt'):
                 with open(data_dir) as infile:
                     for line in infile:
@@ -325,6 +331,7 @@ class RAMProvider(TorchDataset):
 
         # Get dataset name for cache
         cache_name = os.path.basename(data_dir).replace('/', '_').replace('\\', '_').replace('.', '_')
+        cache_name += f'_{data_key}' if data_key is not None else ""
         cache_name += f'_ram_{chunk_len}_{chunk_only_one}_{chunk_rate}_{chunk_random_crop}_{chunk_linear_subsample}'
         cache_name += f'_label_{"all" if  labels is None else "".join(str(l) for l in labels).replace(" ", "_")}'
         cache_name += f'_ch_{"all" if  channels_list is None else "".join(str(c) for c in channels_list).replace(" ", "_")}'
@@ -333,6 +340,7 @@ class RAMProvider(TorchDataset):
         # Create setup map
         setup_map = {'files': self.files,
                      'data_dir': os.path.basename(data_dir),
+                     'data_key': data_key,
                      'labels': labels,
                      'channels_list_setup': channels_list,
                      'channels_name_setup': channels_name,
@@ -369,6 +377,7 @@ class RAMProvider(TorchDataset):
             self.data = []
             # Create FS provider
             fs_provider = FSProvider(data_dir,
+                                     data_key = data_key,
                                      data_location=data_location,
                                      chunk_len=chunk_len,
                                      chunk_only_one=chunk_only_one,
@@ -414,11 +423,12 @@ class RAMProvider(TorchDataset):
 
 class Dataset(TorchDataset):
 
-    def __init__(self, data_dir, data_location, chunk_len, chunk_only_one=False, chunk_rate=1, chunk_random_crop=False, data_sampling_frequency=None, chunk_linear_subsample=1, chunk_butterworth_lowpass=None, chunk_butterworth_highpass=None, chunk_butterworth_order=2, normalize_params=None, channels_list=None, channels_name=None, cache_dir='./cache', labels=None, provider='ram'):
+    def __init__(self, data_dir, data_location, data_key, chunk_len, chunk_only_one=False, chunk_rate=1, chunk_random_crop=False, data_sampling_frequency=None, chunk_linear_subsample=1, chunk_butterworth_lowpass=None, chunk_butterworth_highpass=None, chunk_butterworth_order=2, normalize_params=None, channels_list=None, channels_name=None, cache_dir='./cache', labels=None, provider='ram'):
         """
         Args:
         - data_dir (string): path to directory containing files.
         - data_location (string): path to directory containing files (if data_dir is a file list).
+        - data_key (string): key used if data_dir is a dict.
         - chunk_len (int): length of each item returned by the dataset
         - chunk_only_one (boolean): take one or all chunk of single signal
         - chunk_rate (int): if chunk_only_one=False, take one chunk every chunk_rate
@@ -443,6 +453,7 @@ class Dataset(TorchDataset):
         if self.provider == 'ram':
             self.provider = RAMProvider(data_dir,
                                         data_location=data_location,
+                                        data_key=data_key,
                                         chunk_len=chunk_len,
                                         chunk_only_one=chunk_only_one,
                                         chunk_rate=chunk_rate,
@@ -459,6 +470,7 @@ class Dataset(TorchDataset):
         elif self.provider == 'fs':
             self.provider = FSProvider(data_dir,
                                        data_location=data_location,
+                                       data_key=data_key,
                                        chunk_len=chunk_len,
                                        chunk_only_one=chunk_only_one,
                                        chunk_rate=chunk_rate,

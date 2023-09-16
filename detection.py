@@ -1,6 +1,6 @@
 import itertools
 import os
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from pathlib import Path
 from time import time
 
@@ -9,13 +9,14 @@ import pandas as pd
 import torch
 from torch.utils import data
 from tqdm import tqdm
-from utils.check_predictions import check_predictions
+from utils.check_predictions import check_predictions_main
 from utils.dataset import Dataset
 from utils.detection_plotter import interactive_plot, plot
 from utils.model import Model
 from utils.parser import check_detection_args, detection_parse
 from utils.saver import Saver
 
+debug = False
 
 def overlap(event, alarm):
     if alarm[1] < event[0] or alarm[0] > event[1]:
@@ -51,6 +52,7 @@ if __name__ == '__main__':
     # Instantiate dataset
     detection_dataset = Dataset(args['detection_dir'],
                                 data_location=args['data_location'],
+                                data_key=args['data_key'],
                                 chunk_len=args['chunk_len'],
                                 chunk_only_one=args['chunk_only_one'],
                                 chunk_rate=args['chunk_rate'],
@@ -73,6 +75,17 @@ if __name__ == '__main__':
     sample_len = int(min(i for i in [j-i for i, j in zip(times[:-1], times[1:])] if i > 0)/60)  # minutes
 
     args, labels_list, date_time_list = check_detection_args(args, detection_dataset.get_channels_name())
+
+    # Create output folder
+    timestamp_str = datetime.fromtimestamp(time()).strftime('%Y-%m-%d_%H-%M-%S')
+    if isinstance(args['tag'], str) and len(args['tag']) > 0:
+        timestamp_str += f"_{args['tag']}"
+    vot = "voting" if args['voting'] else "no_voting"
+    if os.path.isfile(checkpoint) or os.path.basename(os.path.normpath(checkpoint)) == "ckpt":
+        detection_output = os.path.abspath(os.path.join(os.path.join(os.path.dirname(checkpoint), os.pardir), "output/detection/" + f'{timestamp_str}_{vot}'))
+    else:
+        detection_output = os.path.join(checkpoint, "output/detection/" + f'{timestamp_str}_{vot}')
+    Path(detection_output).mkdir(parents=True, exist_ok=True)
 
     # Setup model
     model = Model(data_len=int(hyperparams['chunk_len'] / hyperparams['chunk_linear_subsample']),
@@ -98,8 +111,12 @@ if __name__ == '__main__':
 
     # Group reconstructions
     outLIN = []
+    if debug:
+        det_dataset_sig = []
     outLABEL = []
-    outTIMESTAMP = []
+    outTIMESTAMP_chunk = []
+    outTIMESTAMP_start = []
+    rec_sig = []
     for i, sig_batch in enumerate(tqdm(out, desc='Elaborating')):
         for j in range(sig_batch.shape[0]):  # batch
             tmp_sig = torch.zeros(sig_batch.shape[1:])
@@ -110,10 +127,18 @@ if __name__ == '__main__':
                 else:
                     tmp_sig[k] = np.nan
             outLIN.append(tmp_sig)
+            if debug:
+                det_dataset_sig.append(detection_dataset[i * args['batch_size']+j][0])
+                rec_sig.append(sig_batch[j])
             outLABEL.append(detection_dataset[i*args['batch_size']+j][1])
-            outTIMESTAMP.append(detection_dataset[i*args['batch_size']+j][2])
+            outTIMESTAMP_chunk.append(detection_dataset[i*args['batch_size']+j][2])
+            outTIMESTAMP_start.append(detection_dataset[i*args['batch_size']+j][3])
     outUNIONdiff = torch.stack(outLIN)
-    outDATETIME = [datetime.fromtimestamp(t, timezone.utc) for t in outTIMESTAMP]
+    outDATETIME_chunk = [datetime.fromtimestamp(t, timezone.utc) for t in outTIMESTAMP_chunk]
+    outDATETIME_start = [datetime.fromtimestamp(t, timezone.utc) for t in outTIMESTAMP_start]
+    if debug:
+        det_dataset_sig = torch.stack(det_dataset_sig)
+        rec_sig = torch.stack(rec_sig)
 
     # Compute reconstruction distances
     print("Compute reconstruction distances per channel...")
@@ -121,29 +146,43 @@ if __name__ == '__main__':
     # Concat mean of dists
     dist = torch.cat([dist, dist.mean(dim=1).unsqueeze(1)], 1)
 
-    rounded_outDATETIME = []
-    for dt in outDATETIME:
-        # round to nearest sample_len minutes
-        round_to = 60 * sample_len  # seconds = 60 * sample_len minutes
-        seconds = (dt - dt.min.replace(tzinfo=timezone.utc)).seconds
-        rounding = (seconds+round_to/2) // round_to * round_to
-        rounded_dt = dt + timedelta(0, rounding-seconds, -dt.microsecond)
-        rounded_outDATETIME.append(rounded_dt)
-
-    labels = labels_list[date_time_list.index(min(rounded_outDATETIME)):date_time_list.index(max(rounded_outDATETIME))+1]
+    labels = labels_list[date_time_list.index(min(outDATETIME_start)):date_time_list.index(max(outDATETIME_start))+1]
 
     # Complete time series
-    df = pd.DataFrame(list(zip(rounded_outDATETIME, outDATETIME)), columns=['roundedDatetime', 'Datetime'])
+    df = pd.DataFrame(list(zip(outDATETIME_start, outDATETIME_chunk)), columns=['roundedDatetime', 'Datetime'])
 
     threshold_dict = dict()
+    th_str = None
     for i in range(dist.shape[1]):
         df["dist_" + str(i)] = dist[:, i]
-        if args['voting'] is False:
-            threshold_dict[i] = [0] + np.nanpercentile(dist[:, i], args['threshold_percentiles']).tolist()
+        # Add reconstructed signal to df
+        if debug:
+            if i < outUNIONdiff.shape[1]:
+                df["rec_sig_" + str(i)] = rec_sig[:, i, :].tolist()
+                df["orig_sig_" + str(i)] = det_dataset_sig[:, i, :].tolist()
+        if args['threshold_percentiles'] is not None:
+            if args['voting'] is False:
+                if len(args['threshold_percentiles']) == dist.shape[1]:
+                    th_str = "best"
+                    threshold_dict[i] = [np.nanpercentile(dist[:, i], args['threshold_percentiles'][i]).tolist()]   # one percentile for channel
+                else:
+                    threshold_dict[i] = np.nanpercentile(dist[:, i], args['threshold_percentiles']).tolist()        # list of percentiles for each channel
+        elif args['fixed_thresholds'] is not None:
+            #mul_values = [0.5, 0.6, 0.7, 0.8, 0.9, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+            #threshold_dict[i] = [(args['fixed_thresholds'][i]) * m for m in mul_values]
+            if os.path.isfile(args['fixed_thresholds']) and args['fixed_thresholds'].lower().endswith('.pt'):
+                temp_thresh = torch.load(args['fixed_thresholds'])
+                threshold_dict[i] = [temp_thresh[i]]
+            else:
+                threshold_dict[i] = [args['fixed_thresholds'][i]] 
+    torch.save(threshold_dict, os.path.join(detection_output, "threshold_dict.pt"))
 
     r = pd.date_range(start=df.roundedDatetime.min(), end=df.roundedDatetime.max(), freq=str(sample_len) + "T")
     df = df.set_index('roundedDatetime').reindex(r).fillna(np.nan).rename_axis('roundedDatetime').reset_index()
     df['labels'] = labels
+
+    if debug:
+        torch.save(df, os.path.join(detection_output, "dist_df.pt"))
 
     # Extract complete reconstruction distance from df
     complete_dist = torch.Tensor()
@@ -154,15 +193,6 @@ if __name__ == '__main__':
     events = list(zip(df.index, df.labels))
     ev_groups = [list(group) for key, group in itertools.groupby(events, lambda i: i[1] == args['detection_labels'][0])]
     event_list = [(it[0][0], it[-1][0], it[0][1]) for it in ev_groups if it[0][1] == args['detection_labels'][0]]
-
-    # Create output folder
-    timestamp_str = datetime.fromtimestamp(time()).strftime('%Y-%m-%d_%H-%M-%S')
-    vot = "voting" if args['voting'] else "no_voting"
-    if os.path.isfile(checkpoint) or os.path.basename(os.path.normpath(checkpoint)) == "ckpt":
-        detection_output = os.path.abspath(os.path.join(os.path.join(os.path.dirname(checkpoint), os.pardir), "output/detection/" + f'{timestamp_str}_{vot}'))
-    else:
-        detection_output = os.path.join(checkpoint, "output/detection/" + f'{timestamp_str}_{vot}')
-    Path(detection_output).mkdir(parents=True, exist_ok=True)
 
     # Dump experiment hyper-params
     with open(os.path.join(detection_output, 'hyperparams.txt'), mode='w') as f:
@@ -196,7 +226,7 @@ if __name__ == '__main__':
                 all_ok[nan_vot] = np.nan
 
                 alm_list = [True if it == 1 else (False if it == 0 else np.nan) for it in all_ok.tolist()]
-                groups = [list(group) for key, group in itertools.groupby(alm_list, lambda i: (i == True, i == False))]
+                groups = [list(group) for key, group in itertools.groupby(alm_list, lambda i: i == True)]
                 hysteresis_groups = [groups[0]] + [[True if j < hy else groups[i][j] for j in range(len(groups[i]))] if ((groups[i][0] == False or np.isnan(groups[i][0])) and groups[i-1][-1] == True) else groups[i] for i in range(1, len(groups))]
                 ch_th_dist_hysteresis = [item for sublist in hysteresis_groups for item in sublist]
                 alm_groups = [list(group) for key, group in itertools.groupby(enumerate(ch_th_dist_hysteresis), lambda i: (i[1] == True, i[1] == False))]
@@ -216,13 +246,14 @@ if __name__ == '__main__':
                     count_FP = 0
                     count_FN = 0
                     time_alarm = 0
+                    FP_length = 0
                     advance_delay = 0
 
                     event_list_clean = remove_event_nan(event_list, alrm_dict[key][th])
 
                     for ev in event_list_clean:
                         for al in alrm_dict[key][th]:
-                            if al[2]:
+                            if not np.isnan(al[2]):
                                 ov = overlap(ev, al)
                                 if ov is not False:
                                     if ev not in (item[0] for item in detections):
@@ -232,9 +263,10 @@ if __name__ == '__main__':
                                         already_detected.append(al)
 
                     for al in alrm_dict[key][th]:
-                        if al[2]:
+                        if not np.isnan(al[2]):
                             time_alarm += al[1]-al[0]+1
                             if al not in (item[1] for item in detections) and al not in already_detected:
+                                FP_length += al[1]-al[0]+1
                                 count_FP += 1
 
                     for ev in event_list_clean:
@@ -262,7 +294,15 @@ if __name__ == '__main__':
                     dt_dict["TIME_ALARM"] = (time_alarm/len(events))*100
                     dt_dict["ADVANCE_DELAY"] = (advance_delay*sample_len)/len(detections) if len(detections) != 0 else np.nan
                     dt_dict["DETECTIONS"] = detections
-                    th_dict[str(([0] + args['threshold_percentiles'])[t])] = dt_dict
+                    if args['threshold_percentiles'] is not None:
+                        thres = f"{args['threshold_percentiles'][t]}-{th}"
+                    elif args['fixed_thresholds'] is not None:
+                        if os.path.isfile(args['fixed_thresholds']):
+                            thres = f"{t}-{th}"
+                        else:
+                            thres = f"{th}"
+                        #thres = f"{mul_values[t]}-{th}"
+                    th_dict[thres if th_str is None else th_str] = dt_dict
 
             detection_dict[key] = th_dict
     elif args['voting'] is True:
@@ -270,7 +310,7 @@ if __name__ == '__main__':
         ch_co_hy_list = list(itertools.product(range(1, len(args['detection_channels_voting'])+1), args['consecutive_outliers_voting'], args['hysteresis_voting']))
 
         # If all percentiles are equal
-        th_str = str(args['consecutive_outliers_voting'][0]) if args['consecutive_outliers_voting'].count(args['consecutive_outliers_voting'][0]) == len(args['consecutive_outliers_voting']) else "best"
+        th_str = str(args['threshold_percentile_voting'][0]) if args['threshold_percentile_voting'].count(args['threshold_percentile_voting'][0]) == len(args['threshold_percentile_voting']) else "best"
 
         vot_index = [i for i in range(len(args['channels_list'])) if args['channels_list'][i] in args['detection_channels_voting']]
         complete_dist_vot = complete_dist[:, vot_index]
@@ -297,12 +337,12 @@ if __name__ == '__main__':
             all_ok[nan_vot] = np.nan
 
             alm_list = [True if it == 1 else (False if it == 0 else np.nan) for it in all_ok.tolist()]
-            groups = [list(group) for key, group in itertools.groupby(alm_list, lambda i: (i == True, i == False))]
+            groups = [list(group) for key, group in itertools.groupby(alm_list, lambda i: i == True)]
             hysteresis_groups = [groups[0]] + [[True if j < hy else groups[i][j] for j in range(len(groups[i]))] if ((groups[i][0] == False or np.isnan(groups[i][0])) and groups[i-1][-1] == True) else groups[i] for i in range(1, len(groups))]
             ch_th_dist_hysteresis = [item for sublist in hysteresis_groups for item in sublist]
             alm_groups = [list(group) for key, group in itertools.groupby(enumerate(ch_th_dist_hysteresis), lambda i: (i[1] == True, i[1] == False))]
             start_finish_alarms = [(gt[0][0], gt[-1][0], gt[0][1]) for gt in alm_groups if (gt[0][1] == True or np.isnan(gt[0][1]))]
-            alrm_dict["VOT"+str(ch)+"_CO" + str(co)+"_HY"+str(hy)+"_THperc"+th_str] = start_finish_alarms
+            alrm_dict["VOT"+str(ch)+"_CO" + str(co)+"_HY"+str(hy_hour)+"_THperc"+th_str] = start_finish_alarms
 
         detection_dict = dict()
         for key in tqdm(alrm_dict.keys(), desc="Detecting"):
@@ -318,7 +358,7 @@ if __name__ == '__main__':
 
             for ev in event_list_clean:
                 for al in alrm_dict[key]:
-                    if al[2]:
+                    if not np.isnan(al[2]):
                         ov = overlap(ev, al)
                         if ov is not False:
                             if ev not in (item[0] for item in detections):
@@ -328,7 +368,7 @@ if __name__ == '__main__':
                                 already_detected.append(al)
 
             for al in alrm_dict[key]:
-                if al[2]:
+                if not np.isnan(al[2]):
                     time_alarm += al[1]-al[0]+1
                     if al not in (item[1] for item in detections) and al not in already_detected:
                         count_FP += 1
@@ -340,7 +380,6 @@ if __name__ == '__main__':
             TP = len(detections)
             FP = count_FP
             FN = count_FN
-
             TPR = TP/(TP+FN) if (TP+FN) != 0 else 0
             PPV = TP/(TP+FP) if (TP+FP) != 0 else 0
             FDR = FP/(TP+FP) if (TP+FP) != 0 else 0
@@ -358,7 +397,6 @@ if __name__ == '__main__':
             dt_dict["TIME_ALARM"] = (time_alarm/len(events))*100
             dt_dict["ADVANCE_DELAY"] = (advance_delay*sample_len)/len(detections) if len(detections) != 0 else np.nan
             dt_dict["DETECTIONS"] = detections
-
             detection_dict[key] = dt_dict
 
     # Saving output
@@ -367,7 +405,7 @@ if __name__ == '__main__':
     torch.save(detection_dict, det_dict_path)
 
     # Check Prediction
-    check_predictions(detection_dict, detection_output, "detection_" + vot + ".xlsx")
+    check_predictions_main(args['voting'], detection_dict, detection_output, "detection_" + vot + ".xlsx")
 
     # Plot
     plot(det_dict_path, args['channels_name'])

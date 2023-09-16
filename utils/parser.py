@@ -40,6 +40,7 @@ def training_parse():
             # Verify setup integrity
             if not all(key in output.keys() for key in ['train_dir',
                                                         'val_dir',
+                                                        'data_key',
                                                         'data_location',
                                                         'chunk_len',
                                                         'chunk_only_one',
@@ -92,6 +93,7 @@ def training_parse():
 # Dataset options\n\
 train_dir: './dataset/trainingSet'\n\
 val_dir: './dataset/validationSet'\n\
+data_key: ''\n\
 data_location: './path/to/data/'\n\
 chunk_len: 512\n\
 chunk_only_one: False\n\
@@ -183,6 +185,7 @@ def detection_parse():
             # Verify setup integrity
             if not all(key in output.keys() for key in ['checkpoint',
                                                         'detection_dir',
+                                                        'data_key',
                                                         'data_location',
                                                         'chunk_len',
                                                         'chunk_only_one',
@@ -199,8 +202,10 @@ def detection_parse():
                                                         'data_provider',
                                                         'mean',
                                                         'std',
+                                                        'tag',
                                                         'original_labels',
                                                         'detection_labels',
+                                                        'fixed_thresholds',
                                                         'threshold_percentiles',
                                                         'consecutive_outliers',
                                                         'hysteresis',
@@ -223,6 +228,7 @@ checkpoint: './logs/yyyy-mm-dd_hh-mm-ss_ae/'\n\
 \n\
 # Dataset options\n\
 detection_dir: './dataset/detectionSet'\n\
+data_key: ''\n\
 data_location: './path/to/data/'\n\
 chunk_len: 512\n\
 chunk_only_one: False\n\
@@ -241,8 +247,10 @@ mean: None\n\
 std: None\n\
 \n\
 # Detection options\n\
+tag: ''\
 original_labels: './path/to/labels'\n\
 detection_labels: [2]\n\
+fixed_thresholds: None\n\
 threshold_percentiles: None\n\
 consecutive_outliers: None\n\
 hysteresis: None\n\
@@ -297,11 +305,11 @@ def check_detection_args(args, ch_names):
     if args['voting'] is False:
         print("Channel voting mechanism disabled:")
 
-        # Check threshold_percentiles
+        """ # Check threshold_percentiles
         if args['threshold_percentiles'] is None:
             raise TypeError("\tThreshold Percentiles must not be None")
         else:
-            print("\tThreshold Percentiles =", args['threshold_percentiles'])
+            print("\tThreshold Percentiles =", args['threshold_percentiles']) """
 
         # Check consecutive_outliers
         if args['consecutive_outliers'] is None:

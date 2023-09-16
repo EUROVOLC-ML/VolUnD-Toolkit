@@ -13,6 +13,7 @@ if __name__ == '__main__':
     # Create dataset
     train_dataset = Dataset(args['train_dir'],
                             data_location=args['data_location'],
+                            data_key=args['data_key'],
                             chunk_len=args['chunk_len'],
                             chunk_only_one=args['chunk_only_one'],
                             chunk_rate=args['chunk_rate'],
@@ -29,6 +30,7 @@ if __name__ == '__main__':
                             labels=args['training_labels'])
     val_dataset = Dataset(args['val_dir'],
                           data_location=args['data_location'],
+                          data_key=args['data_key'],
                           chunk_len=args['chunk_len'],
                           chunk_only_one=args['chunk_only_one'],
                           chunk_rate=args['chunk_rate'],

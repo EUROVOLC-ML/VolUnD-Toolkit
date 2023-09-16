@@ -84,7 +84,7 @@ class Saver(object):
         torch.save({'model_state_dict': model_state_dict, 'stats': stats,
                     'epoch': epoch}, self.ckpt_path / f'{name}_{epoch:05d}.pth')
 
-    def dump_line(self, line, step, split, name, fmt=''):
+    def dump_line(self, line, step, split, name, label=None, timestamp=None, orig_timestamp=None, fmt=''):
         """
         Dump line as matplotlib figure into folder and tb
 
@@ -98,6 +98,7 @@ class Saver(object):
                      line_y.cpu().detach().numpy(), fmt)
         else:
             plt.plot(line.cpu().detach().numpy(), fmt)
+            fig.suptitle(f"Chunk Time: {datetime.fromtimestamp(timestamp.item()).strftime('%Y-%m-%d %H:%M:%S %Z')}\n Time: {datetime.fromtimestamp(orig_timestamp.item()).strftime('%Y-%m-%d %H:%M:%S %Z')}\n Label: {label.item()}")
         out_path = self.output_path[split] / f'line_{step:08d}_{name}.jpg'
         plt.savefig(out_path)
         self.writer.add_figure(f'{split}/{name}', fig, step)
@@ -131,6 +132,7 @@ class Saver(object):
             hyperparams_path = os.path.join(hyperparams_path, 'hyperparams.txt')
         else:
             hyperparams_path = os.path.join(hyperparams_path.parent.parent, 'hyperparams.txt')
+        print(f"Loaded hyperparams from {hyperparams_path}")
         # Prepare output
         output = {}
         # Read file

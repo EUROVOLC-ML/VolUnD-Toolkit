@@ -42,8 +42,41 @@ def check_predictions(detection_dict, detection_path, excel_name):
     df = pd.DataFrame(data, columns=["key", "TH", "F1", "F05", "TPR", "PPV", "FDR", "TP", "FP", "FN", "Time in alarm %", "Advance/Delay hh:mm:ss"])
 
     print("Saving prediction results in: " + str(Path(detection_path) / Path(excel_name)))
-    df.to_excel(Path(detection_path) / Path(excel_name))
+    df.to_excel(Path(detection_path) / Path(excel_name), index=False)
 
+def check_predictions_voting(detection_dict, detection_path, excel_name):
+    data = []
+    for key in detection_dict.keys():
+        TP = detection_dict[key]["TP"]
+        FP = detection_dict[key]["FP"]
+        FN = detection_dict[key]["FN"]
+        TPR = detection_dict[key]["TPR"]
+        FDR = detection_dict[key]["FDR"]
+        PPV = detection_dict[key]["PPV"]
+        F1 = detection_dict[key]["F1"]
+        F05 = detection_dict[key]["F05"]
+        time_alrm_ar = round(detection_dict[key]["TIME_ALARM"], 3)
+        adv_del = round(detection_dict[key]["ADVANCE_DELAY"]) if not np.isnan(detection_dict[key]["ADVANCE_DELAY"]) else np.nan
+        if np.isnan(adv_del):
+            adv_del_time = np.nan
+        else:
+            if adv_del >= 0:
+                adv_del_time = str(timedelta(minutes=adv_del))
+            else:
+                adv_del_time = "-" + str(timedelta(minutes=abs(adv_del)))
+        data.append([key, F1, F05, TPR, PPV, FDR, TP, FP, FN, time_alrm_ar, adv_del_time])
+
+    df = pd.DataFrame(data, columns=["key", "F1", "F05", "TPR", "PPV", "FDR", "TP", "FP", "FN", "Time in alarm %", "Advance/Delay hh:mm:ss"])
+
+    print("Saving prediction results in: " + str(Path(detection_path) / Path(excel_name)))
+    df.to_excel(Path(detection_path) / Path(excel_name), index=False)
+
+
+def check_predictions_main(vote, detection_dict, detection_path, excel_name):
+    if vote:
+        check_predictions_voting(detection_dict, detection_path, excel_name)
+    else:
+        check_predictions(detection_dict, detection_path, excel_name)
 
 if __name__ == "__main__":
     args = get_parser_args()
@@ -55,4 +88,4 @@ if __name__ == "__main__":
 
     detection_dict = torch.load(Path(args.detection_path) / Path(det_dict))
 
-    check_predictions(detection_dict, args.detection_path, excel_name)
+    check_predictions_main(args.vot, detection_dict, args.detection_path, excel_name)

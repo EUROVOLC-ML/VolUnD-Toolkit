@@ -9,7 +9,7 @@ import numpy as np
 import torch
 from tqdm import tqdm
 
-matplotlib.use('tkagg')
+#matplotlib.use('tkagg')
 
 
 def parse():
